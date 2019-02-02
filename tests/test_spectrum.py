@@ -4,6 +4,7 @@
 # pylint: disable=redefined-outer-name
 
 import pytest
+import matplotlib.pyplot as plt
 
 from gxps.spectrum import Spectrum
 from gxps import io
@@ -14,7 +15,6 @@ from gxps import io
 parsed_sdicts = [
     io.parse_spectrum_file("tests/fixtures/TiO2-110-f.txt"),
     io.parse_spectrum_file("tests/fixtures/Al-NE-FeCr-S02p6-Fe2p-3.xy"),
-    io.parse_spectrum_file("tests/fixtures/contains_layer_zeros.txt"),
     io.parse_spectrum_file("tests/fixtures/21-04_015-XAS_100.xy"),
 ]
 
@@ -28,7 +28,13 @@ def tio2f():
 
 @pytest.fixture
 def simple_spectrum():
-    return Spectrum(energy=[1, 2, 3], intensity=[4, 5, 6])
+    return Spectrum(energy=[1, 2, 3], intensity=[4, 5, 6], filename="fixture")
+
+parsed_spectra.append(Spectrum(
+    energy=[1, 2, 3],
+    intensity=[4, 5, 6],
+    filename="fixture"
+))
 
 
 ########## Test functions
@@ -44,6 +50,14 @@ def test_spectrum_constructor():
         Spectrum(energy=[[1, 2], [3, 4]], intensity=[[3, 3], [2, 2]])
 
 @pytest.mark.parametrize("spectrum", parsed_spectra)
+def test_spectrum_plot(spectrum):
+    plt.clf()
+    plt.plot(spectrum.energy, spectrum.intensity)
+    # plt.plot(spectrum.energy, bg)
+    suffix = (spectrum.filename.split("/")[-1]).split(".")[0]
+    plt.savefig("tests/plot_verification/s_{}.png".format(suffix))
+
+@pytest.mark.parametrize("spectrum", parsed_spectra)
 def test_spectrum_observability(spectrum):
     x = []
     def cb():
@@ -52,10 +66,16 @@ def test_spectrum_observability(spectrum):
     spectrum.background_type = "linear"
     assert x
 
-def test_spectrum_background_type(simple_spectrum):
+def test_spectrum_background_setters(simple_spectrum):
     with pytest.raises(ValueError):
         simple_spectrum.background_type = "foo"
     with pytest.raises(AttributeError):
         simple_spectrum.energy = [10, 11, 12]
     with pytest.raises(AttributeError):
         simple_spectrum.intensity = [10, 11, 12]
+    with pytest.raises(ValueError):
+        simple_spectrum.background_bounds = [1.1, 1.4, 1.9]
+    with pytest.raises(ValueError):
+        simple_spectrum.background_bounds = [1.1, 1.3, 1.5, 3.8]
+    simple_spectrum.background_type = "linear"
+    simple_spectrum.background_bounds = [1.1, 1.3, 1.8, 2.1]

@@ -1,11 +1,10 @@
 *.pyc
+*cache*
 *venv
-dist/
-*.egg-info
-*.egg
-.old_stuff
-*old_*
 *~
 *.backup
 build
 dist
+*.egg-info
+*.egg
+tests/plot_verification
