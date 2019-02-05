@@ -84,6 +84,31 @@ def linear_bg(energy, intensity):
     background = np.linspace(intensity[0], intensity[-1], samples)
     return background
 
+def calculate_normalization_divisor(norm_type, norm_div, _energy, intensity):
+    """Calculates normalization divisor."""
+    new_divisor = 1.0
+    if norm_type == "highest":
+        new_divisor = intensity.max()
+    elif norm_type == "manual":
+        new_divisor = norm_div
+    elif norm_type == "none":
+        pass
+    elif norm_type == "high_energy":
+        span = intensity.max() - intensity.min()
+        for i, intensity_value in enumerate(intensity[::-1]):
+            if i > 0 and abs(intensity_value - intensity[-1]) > 0.05 * span:
+                new_divisor = intensity[-i:].mean()
+        new_divisor = intensity[-1]
+    elif norm_type == "low_energy":
+        span = intensity.max() - intensity.min()
+        for i, intensity_value in enumerate(intensity):
+            if i > 0 and abs(intensity_value - intensity[0]) > 0.05 * span:
+                new_divisor = intensity[:i].mean()
+        new_divisor = intensity[0]
+    else:
+        ValueError("Invalid normalization type '{}'".format(norm_type))
+    return new_divisor
+
 def is_equidistant(energy, tol=1e-08):
     """Returns True only when energy is equidistant."""
     spacings = np.unique(np.diff(energy))

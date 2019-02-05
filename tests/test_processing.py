@@ -1,4 +1,4 @@
-"""Tests the processing functions."""
+"""Tests the proc functions."""
 # pylint: disable=invalid-name
 # pylint: disable=missing-docstring
 # pylint: disable=redefined-outer-name
@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from gxps.spectrum import Spectrum
 from gxps import io
-from gxps import processing
+from gxps import processing as proc
 
 
 ########## Fixtures
@@ -31,7 +31,8 @@ def tio2f():
 parsed_spectra.append(Spectrum(
     energy=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
     intensity=[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
-    filename="fixture"
+    filename="fixture_fname",
+    name="fixture"
 ))
 
 
@@ -42,11 +43,11 @@ def test_bg_single_funcs(spectrum):
     i1, i2 = int(len(spectrum.energy) / 3), int(len(spectrum.energy) * 2 / 3)
     e, i = spectrum.energy[i1:i2], spectrum.intensity[i1:i2]
     try:
-        bg_s = processing.shirley(e, i)
+        bg_s = proc.shirley(e, i)
         assert len(bg_s) == len(e)
     except FloatingPointError:
         pass
-    bg_l = processing.linear_bg(e, i)
+    bg_l = proc.linear_bg(e, i)
     assert len(bg_l) == len(e)
 
 @pytest.mark.parametrize("spectrum,method", [
@@ -56,7 +57,7 @@ def test_bg_single_funcs(spectrum):
 def test_calculate_background(spectrum, method):
     min_e = spectrum.energy.min()
     span = spectrum.energy.max() - min_e
-    bg = processing.calculate_background(
+    bg = proc.calculate_background(
         method,
         np.array([
             int(min_e + span * 0.1),
@@ -71,5 +72,20 @@ def test_calculate_background(spectrum, method):
     plt.clf()
     plt.plot(spectrum.energy, spectrum.intensity)
     plt.plot(spectrum.energy, bg)
-    suffix = (spectrum.filename.split("/")[-1]).split(".")[0]
+    suffix = (spectrum.meta.filename.split("/")[-1]).split(".")[0]
     plt.savefig("tests/plot_verification/bg_{}_{}.png".format(method, suffix))
+
+@pytest.mark.parametrize("spectrum", parsed_spectra)
+def test_calculate_normalization_divisor(spectrum):
+    e, i = spectrum.energy, spectrum.intensity
+    d = spectrum.normalization_divisor
+    divisor = proc.calculate_normalization_divisor("highest", d, e, i)
+    assert np.isclose(divisor, i.max())
+    divisor = proc.calculate_normalization_divisor("high_energy", d, e, i)
+    assert np.isclose(divisor, i[-2], rtol=0.5)
+    divisor = proc.calculate_normalization_divisor("low_energy", d, e, i)
+    assert np.isclose(divisor, i[2], rtol=0.5)
+    divisor = proc.calculate_normalization_divisor("manual", 4, e, i)
+    assert np.isclose(divisor, 4)
+    divisor = proc.calculate_normalization_divisor("none", d, e, i)
+    assert np.isclose(divisor, 1.0)
