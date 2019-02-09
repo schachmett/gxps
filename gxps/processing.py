@@ -6,7 +6,7 @@ import logging
 import numpy as np
 
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 def calculate_background(bg_type, bg_bounds, energy, intensity):
@@ -29,7 +29,7 @@ def calculate_background(bg_type, bg_bounds, energy, intensity):
                     energy[idx1:idx2], intensity[idx1:idx2]
                 )
             except FloatingPointError:
-                logger.warning("shirley: division by zero")
+                LOGGER.warning("shirley: division by zero")
         elif bg_type == "linear":
             background[idx1:idx2] = linear_bg(
                 energy[idx1:idx2], intensity[idx1:idx2]
@@ -74,7 +74,7 @@ def shirley(energy, intensity, tol=1e-5, maxit=20):
         else:
             background = bnew
     else:
-        logger.warning("shirley: Max iterations exceeded before convergence.")
+        LOGGER.warning("shirley: Max iterations exceeded before convergence.")
 
     return background[::-1]
 

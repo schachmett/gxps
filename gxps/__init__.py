@@ -22,7 +22,7 @@ __website__ = "https://github.com/schachmett/gxps"
 
 BASEDIR = Path(os.path.realpath(__file__)).parents[1]
 assert Path(BASEDIR).is_dir()
-# RSF_DB_PATH = BASEDIR / "gxps/assets/rsf.db"
+RSF_DB_PATH = BASEDIR / "gxps/assets/rsf.db"
 
 CONFDIR = Path(GLib.get_user_config_dir()) / "gxps"
 if not Path(CONFDIR).is_dir():

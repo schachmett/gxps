@@ -32,7 +32,8 @@ parsed_spectra.append(Spectrum(
     energy=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
     intensity=[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
     filename="fixture_fname",
-    name="fixture"
+    name="fixture",
+    key="T 3"
 ))
 
 
@@ -69,11 +70,11 @@ def test_calculate_background(spectrum, method):
         spectrum.intensity
     )
     assert len(bg) == len(spectrum.energy)
-    plt.clf()
     plt.plot(spectrum.energy, spectrum.intensity)
     plt.plot(spectrum.energy, bg)
     suffix = (spectrum.meta.filename.split("/")[-1]).split(".")[0]
     plt.savefig("tests/plot_verification/bg_{}_{}.png".format(method, suffix))
+    plt.clf()
 
 @pytest.mark.parametrize("spectrum", parsed_spectra)
 def test_calculate_normalization_divisor(spectrum):

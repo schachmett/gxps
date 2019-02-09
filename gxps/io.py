@@ -1,24 +1,22 @@
 """Manages database file and has import filters."""
-# pylint: disable=invalid-name
 # pylint: disable=logging-format-interpolation
+# pylint: disable=global-statement
 
 import re
-# import pickle
-# import sqlite3
 import logging
-# import copy
 
 import numpy as np
 
 
-logger = logging.getLogger(__name__)
+SPECTRUM_NUMBER = 0
+LOGGER = logging.getLogger(__name__)
 
 
 def parse_spectrum_file(fname):
     """Checks file extension and calls appropriate parsing method."""
     specdicts = []
-    with open(fname, "r") as f:
-        firstline = f.readline()
+    with open(fname, "r") as sfile:
+        firstline = sfile.readline()
     if fname.split(".")[-1] == "txt":
         if "Region" in firstline:
             for specdict in parse_eistxt(fname):
@@ -33,6 +31,10 @@ def parse_spectrum_file(fname):
         specdicts.append(parse_simple_xy(fname, delimiter=delimiter))
     if not specdicts:
         raise ValueError("Could not parse file '{}'".format(fname))
+    global SPECTRUM_NUMBER
+    for specdict in specdicts:
+        SPECTRUM_NUMBER += 1
+        specdict["key"] = "S {}".format(SPECTRUM_NUMBER)
     return specdicts
 
 def parse_simple_xy(fname, delimiter=None):
@@ -48,7 +50,7 @@ def parse_simple_xy(fname, delimiter=None):
         "filename": fname,
         "energy": energy,
         "intensity": intensity,
-        "name": "SXY",
+        "name": "S XY",
         "notes": "file {}".format(fname.split("/")[-1])
     }
     return specdict
