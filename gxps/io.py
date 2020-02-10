@@ -4,12 +4,39 @@
 
 import re
 import logging
+import pickle
+import sqlite3
+import copy
 
 import numpy as np
 
+from gxps import ASSETDIR
 
-SPECTRUM_NUMBER = 0
-LOGGER = logging.getLogger(__name__)
+
+LOG = logging.getLogger(__name__)
+
+
+def load_project(fname):
+    """Loads project file."""
+    with open(fname, "rb") as pfile:
+        state = pickle.load(pfile)
+    return state
+
+
+def save_project(fname, spectrum_container, gui_state):
+    """Saves a StatefulSpectrumContainer as a file."""
+    spectra = copy.copy(spectrum_container.spectra)
+    for spectrum in spectra:
+        spectrum.disconnect_all()
+    active_spectrum_keys = [s.key for s in gui_state.active_spectra]
+    active_peak_keys = [p.key for p in gui_state.active_peaks]
+    state = [
+        spectra,
+        active_spectrum_keys,
+        active_peak_keys
+    ]
+    with open(fname, "wb") as pfile:
+        pickle.dump(state, pfile, pickle.HIGHEST_PROTOCOL)
 
 
 def parse_spectrum_file(fname):
@@ -31,10 +58,6 @@ def parse_spectrum_file(fname):
         specdicts.append(parse_simple_xy(fname, delimiter=delimiter))
     if not specdicts:
         raise ValueError("Could not parse file '{}'".format(fname))
-    global SPECTRUM_NUMBER
-    for specdict in specdicts:
-        SPECTRUM_NUMBER += 1
-        specdict["key"] = "S {}".format(SPECTRUM_NUMBER)
     return specdicts
 
 def parse_simple_xy(fname, delimiter=None):
@@ -94,16 +117,43 @@ def parse_eistxt(fname):
         }
         yield specdict
 
-# def save_project(fname, datahandler):
-#     """Saves the current datahandler object as a binary file."""
-#     with open(fname, "wb") as file:
-#         pickle.dump(datahandler.save(), file, pickle.HIGHEST_PROTOCOL)
-#
-#
-# def load_project(fname, datahandler):
-#     """Loads a datahandler object from a binary file."""
-#     with open(fname, "rb") as file:
-#         datahandler.load(pickle.load(file))
+
+def get_element_rsfs(element, source):
+    """Return dictionary containing rsfs for a specific element / source.
+    """
+    source_photons = {
+        "Al": 1486.3,
+        "Mg": 1253.4
+    }
+    photon_energy = source_photons.get(source, None)
+    if photon_energy is None:
+        photon_energy = float(source)
+    dbfname = str(ASSETDIR / "rsf.db")
+    with sqlite3.connect(dbfname) as database:
+        cursor = database.cursor()
+        sql = """
+            SELECT IsAuger, Orbital, BE, RSF
+            FROM Peak
+            WHERE Element=? AND (Source=? OR Source="Any")
+        """
+        cursor.execute(sql, (element.title(), source))
+        rsf_data = cursor.fetchall()
+        rsf_dicts = []
+        for isauger, orbital, energy, rsf in rsf_data:
+            if isauger == 1.0:
+                binding_energy = photon_energy - energy
+                orbital = orbital.upper()
+            else:
+                binding_energy = energy
+            rsf_dicts.append({
+                "Element": element.title(),
+                "Orbital": orbital,
+                "BE": binding_energy,
+                "RSF": rsf
+            })
+    return rsf_dicts
+
+
 
 # def export_txt(dh, spectrumID, fname):
 #     """Export given spectra and everything that belongs to it as txt."""

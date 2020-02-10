@@ -2,24 +2,24 @@
 # pylint: disable=logging-format-interpolation
 
 import logging
+import uuid
 
 
-LOGGER = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 
 class Borg(object):
     """Alternative to Singleton pattern: all instances have the same state."""
     # pylint: disable=too-few-public-methods
     __shared_state = {}
-
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, shared_state=None, **kwargs):
         # pylint: disable=access-member-before-definition
         super().__init__(*args, **kwargs)
-        print(self.__shared_state)
-        print(self.__dict__)
-        if not self.__shared_state:
-            self.__shared_state.update(self.__dict__)
-        self.__dict__ = self.__shared_state
+        if shared_state is None:
+            shared_state = self.__shared_state
+        if not shared_state:
+            shared_state.update(self.__dict__)
+        self.__dict__ = shared_state
 
     @classmethod
     def cleanup(cls):
@@ -27,9 +27,22 @@ class Borg(object):
         cls.__shared_state.clear()
 
 
+class Event:        # pylint: disable=too-few-public-methods
+    """Stores variables during emitting."""
+    def __init__(self, **kwargs):
+        self.signal = "generic"
+        for attr, value in kwargs.items():
+            setattr(self, attr, value)
+
+    def __getattr__(self, attr):
+        try:
+            return super().__getattr__(attr)
+        except AttributeError:
+            return None
+
+
 class Observable:
-    """
-    Provides methods for observing these objects via callbacks.
+    """Provides methods for observing these objects via callbacks.
     """
     _signals = (
         "changed",
@@ -39,44 +52,72 @@ class Observable:
         "changed-fit",
         "changed-peak"
     )
-
     def __init__(self, *args, **kwargs):
-        self._observers = dict((signal, []) for signal in self._signals)
+        self._observers = dict((signal, {}) for signal in self._signals)
         self._propagators = {}
         super().__init__(*args, **kwargs)
 
-    def connect(self, signal, cb_func):
+    @property
+    def signals(self):
+        """Makes signals accessible."""
+        return self._signals
+
+    def connect(self, signal, cb_func, *args, **kwargs):
+        """Registers cb_func as a callback for the specified signal. signal
+        has to be in self._signals.
         """
-        Registers cb_func as a callback for the specified signal. signal
-        has to be in self._signals
-        """
+        handler_id = uuid.uuid1()
         if signal not in self._observers:
             raise ValueError("Unknown signal '{}'".format(signal))
-        self._observers[signal].append(cb_func)
+        self._observers[signal][handler_id] = (cb_func, args, kwargs)
+        return handler_id
 
-    def disconnect(self, signal, cb_func):
+    def disconnect(self, handler_id):
+        """Deregisters cb_func as a callback for the specified signal.
         """
-        Deregisters cb_func as a callback for the specified signal.
+        for signal in self._observers:
+            self._observers[signal].pop(handler_id, None)
+
+    def disconnect_all(self):
+        """Deregisters all cb_funcs.
         """
-        self._observers[signal].remove(cb_func)
+        for signal in self._observers:
+            self._observers[signal].clear()
 
-    def _start_propagating(self, other, signal):
-        """Emit the same signal as other."""
-        def re_emit(*args):
-            """Re-emit the signal from self."""
-            self._emit(signal, *args, source=other)
-        self._propagators[(id(other), signal)] = re_emit
-        other.connect(signal, re_emit)
+    def _start_propagating(self, child, signal):
+        """Emit the same signal as child."""
+        handler_id = child.connect(signal, self._re_emit)
+        self._propagators[handler_id] = child
+        return handler_id
 
-    def _stop_propagating(self, other, signal):
-        """Stop re-emitting the signal from other."""
-        re_emit = self._propagators.pop((id(other), signal))
-        other.disconnect(re_emit)
+    def _re_emit(self, event):
+        kwargs = vars(event)
+        kwargs["re_emitted"] = True
+        signal = kwargs.pop("signal", None)
+        self._emit(signal, **kwargs)
 
-    def _emit(self, signal, *args, source=None):
+    def _stop_propagating(self, handler_id):
+        """Stop re-emitting the signal from child."""
+        child = self._propagators.pop(handler_id)
+        child.disconnect(handler_id)
+
+    def _stop_propagating_all(self, child):
+        """Stop re-emitting all signals from child."""
+        handler_ids = []
+        for handler_id in self._propagators:
+            if self._propagators[handler_id] == child:
+                handler_ids.append(handler_id)
+        for handler_id in handler_ids:
+            self._stop_propagating(handler_id)
+
+    def _emit(self, signal, **attrs):
         """Calls callbacks for signal signal."""
-        if source is None:
-            source = self
-            LOGGER.debug("'{}' emitting signal '{}'...".format(source, signal))
-        for cb_func in self._observers[signal]:
-            cb_func(source, *args)
+        # pylint: disable=attribute-defined-outside-init
+        event = Event()
+        event.source = attrs.pop("source", self)
+        event.signal = attrs.pop("signal", signal)
+        for key, value in attrs.items():
+            setattr(event, key, value)
+        for handler_id in self._observers[signal]:
+            cb_func, args, kwargs = self._observers[signal][handler_id]
+            cb_func(event, *args, **kwargs)

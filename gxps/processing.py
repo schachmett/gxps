@@ -1,12 +1,13 @@
 """Provides functions for processing spectrum data."""
 # pylint: disable=invalid-name
+# pylint: disable=logging-format-interpolation
 
 import logging
 
 import numpy as np
 
 
-LOGGER = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 
 def calculate_background(bg_type, bg_bounds, energy, intensity):
@@ -29,7 +30,7 @@ def calculate_background(bg_type, bg_bounds, energy, intensity):
                     energy[idx1:idx2], intensity[idx1:idx2]
                 )
             except FloatingPointError:
-                LOGGER.warning("shirley: division by zero")
+                LOG.warning("shirley: division by zero")
         elif bg_type == "linear":
             background[idx1:idx2] = linear_bg(
                 energy[idx1:idx2], intensity[idx1:idx2]
@@ -39,6 +40,12 @@ def calculate_background(bg_type, bg_bounds, energy, intensity):
         else:
             raise ValueError("Unknown background type '{}'".format(bg_type))
     return background
+
+
+def intensity_at_energy(energy, intensity, energy_value):
+    """Gives back the intensity value at energy_value."""
+    idx = np.searchsorted(energy, energy_value)
+    return intensity[idx]
 
 
 def shirley(energy, intensity, tol=1e-5, maxit=20):
@@ -74,7 +81,7 @@ def shirley(energy, intensity, tol=1e-5, maxit=20):
         else:
             background = bnew
     else:
-        LOGGER.warning("shirley: Max iterations exceeded before convergence.")
+        LOG.warning("shirley: Max iterations exceeded before convergence.")
 
     return background[::-1]
 
@@ -98,13 +105,17 @@ def calculate_normalization_divisor(norm_type, norm_div, _energy, intensity):
         for i, intensity_value in enumerate(intensity[::-1]):
             if i > 0 and abs(intensity_value - intensity[-1]) > 0.05 * span:
                 new_divisor = intensity[-i:].mean()
-        new_divisor = intensity[-1]
+                break
+        else:
+            new_divisor = intensity[-1]
     elif norm_type == "low_energy":
         span = intensity.max() - intensity.min()
         for i, intensity_value in enumerate(intensity):
             if i > 0 and abs(intensity_value - intensity[0]) > 0.05 * span:
                 new_divisor = intensity[:i].mean()
-        new_divisor = intensity[0]
+                break
+        else:
+            new_divisor = intensity[0]
     else:
         ValueError("Invalid normalization type '{}'".format(norm_type))
     return new_divisor
@@ -127,6 +138,7 @@ def make_increasing(energy, intensity):
 def make_equidistant(energy, intensity):
     """Makes x, y pair so that x is equidistant."""
     spacings = np.unique(np.diff(energy))
+    #TODO what if spacings.min() is 0?
     if all([np.isclose(spacing, spacings[0]) for spacing in spacings]):
         return energy, intensity
     samples = int((energy.max() - energy.min()) / spacings.min())

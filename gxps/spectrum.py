@@ -4,31 +4,39 @@
 
 import logging
 import re
+import uuid
 
 import numpy as np
 from lmfit import Parameters
 from lmfit.models import PseudoVoigtModel
 
-from gxps.utility import Observable, Borg
+from gxps.utility import Observable
 from gxps.processing import (
-    calculate_background, make_equidistant, make_increasing,
+    intensity_at_energy,
+    calculate_background,
+    make_equidistant,
+    make_increasing,
     calculate_normalization_divisor
 )
 
 
-LOGGER = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 
-class SpectrumContainer(Observable, Borg):
+class SpectrumContainer(Observable): #, Borg):
+    """Manages a list of several spectra.
     """
-    Manages a list of several spectra.
-    """
-    __shared_state = {}
-
+    _signals = (
+        "changed-spectra",
+        "changed-spectrum",
+        "changed-metadata",
+        "changed-fit",
+        "changed-peak"
+    )
     def __init__(self, *args, **kwargs):
         self._spectra = {}
         super().__init__(*args, **kwargs)
-        LOGGER.debug("{} created".format(self))
+        LOG.debug("{} created".format(self))
 
     @property
     def spectra(self):
@@ -40,49 +48,116 @@ class SpectrumContainer(Observable, Borg):
         """Returns list of spectrum keys."""
         return list(self._spectra.keys())
 
-    def add_spectrum(self, **specdict):
+    def add_spectrum(self, spectrum=None, **specdict):
         """Adds a spectrum."""
-        if specdict["key"] in self._spectra:
-            raise ValueError("Spectrum key already exists")
-        spectrum = Spectrum(**specdict)
+        if not spectrum:
+            spectrum = Spectrum(**specdict)
+        if spectrum.key in self._spectra:
+            spectrum.rekey()
         self._spectra[spectrum.key] = spectrum
         self._start_propagating(spectrum, "changed-spectrum")
         self._start_propagating(spectrum, "changed-metadata")
         self._start_propagating(spectrum, "changed-fit")
         self._start_propagating(spectrum, "changed-peak")
-        LOGGER.debug("Added spectrum {} to {}".format(spectrum, self))
+        LOG.debug("Added spectrum {} to {}".format(spectrum, self))
         self._emit("changed-spectra")
         return spectrum
 
-    def remove_spectrum(self, spectrum_key):
+    def remove_spectrum(self, spectrum):
         """Removes a spectrum."""
-        self._spectra.pop(spectrum_key)
-        LOGGER.debug("Removed spectrum {} from {}".format(spectrum_key, self))
+        self._stop_propagating_all(spectrum)
+        self._spectra.pop(spectrum.key)
+        LOG.debug("Removed spectrum {} from {}".format(spectrum.key, self))
         self._emit("changed-spectra")
 
     def clear_spectra(self):
         """Clear all spectra from self."""
+        for spectrum in self._spectra:
+            self._stop_propagating_all(spectrum)
         self._spectra.clear()
-        LOGGER.debug("Cleared container {}".format(self))
+        LOG.debug("Cleared container {}".format(self))
         self._emit("changed-spectra")
 
     def __iter__(self):
         for spectrum_key in self._spectra:
-            yield spectrum_key
+            yield self._spectra[spectrum_key]
 
     def __len__(self):
         return len(self._spectra)
 
-    def __getitem__(self, key):
-        return self._spectra[key]
+    def __getitem__(self, iter_):
+        return self._spectra[self.spectrum_keys[iter_]]
+
+
+class StatefulSpectrumContainer(SpectrumContainer):
+    """Spectrum container that keeps subsets of spectra and peaks as
+    "active", i.e. the subsets where operations should apply to.
+    """
+    # __shared_state = {}
+    _signals = (
+        *SpectrumContainer._signals,
+        "changed-active-spectra",
+        "changed-active-peaks",
+    )
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self._active_spectra = []
+        self._active_peaks = []
+        self.connect("changed-spectra", self._update_active)
+
+    @property
+    def active_spectra(self):
+        """Currently active spectra.
+        """
+        self.active_spectra = self._active_spectra
+        return self._active_spectra.copy()
+
+    @active_spectra.setter
+    def active_spectra(self, spectra):
+        """Activates given spectra.
+        """
+        if spectra == self._active_spectra:
+            return
+        for spectrum in spectra.copy():
+            if spectrum not in self.spectra:
+                spectra.remove(spectrum)
+        self._active_spectra.clear()
+        self._active_spectra.extend(spectra)
+        self._emit("changed-active-spectra")
+
+    @property
+    def active_peaks(self):
+        """Currently active peaks.
+        """
+        self.active_peaks = self._active_peaks
+        return self._active_peaks.copy()
+
+    @active_peaks.setter
+    def active_peaks(self, peaks):
+        """Activates given peaks.
+        """
+        if peaks == self._active_peaks:
+            return
+        for peak in peaks.copy():
+            for spectrum in self.active_spectra:
+                if peak in spectrum.model.peaks:
+                    break
+            else:
+                peaks.remove(peak)
+        self._active_peaks.clear()
+        self._active_peaks.extend(peaks)
+        self._emit("changed-active-peaks")
+
+    def _update_active(self, *_args):
+        self.active_peaks = self._active_peaks
+        self.active_spectra = self._active_spectra
 
 
 class Spectrum(Observable):
     """
     Holds data from one single spectrum.
     """
-
-    _required = ("energy", "intensity", "key")
+    _required = ("energy", "intensity")
     _bg_types = ("none", "linear", "shirley", "tougaard")
     _norm_types = ("none", "manual", "highest", "high_energy", "low_energy")
 
@@ -90,7 +165,8 @@ class Spectrum(Observable):
         super().__init__()
         if not all(a in kwargs for a in self._required):
             raise ValueError("Required attribute(s) missing")
-        self._key = kwargs.pop("key")
+        self._key = None
+        self.rekey()
 
         energy = np.array(kwargs.pop("energy"))
         intensity = np.array(kwargs.pop("intensity"))
@@ -108,13 +184,14 @@ class Spectrum(Observable):
         self._energy_calibration = 0
         self._normalization_type = "none"
         self._normalization_divisor = 1.0
+        self._normalization_energy = None
 
         self.meta = SpectrumMeta(**kwargs)
         self._start_propagating(self.meta, "changed-metadata")
         self.model = SpectrumModel()
         self._start_propagating(self.model, "changed-fit")
         self._start_propagating(self.model, "changed-peak")
-        LOGGER.debug(
+        LOG.debug(
             "Spectrum '{}' created ({}, {}, {})"
             "".format(self.key, self, self.meta, self.model)
         )
@@ -123,6 +200,10 @@ class Spectrum(Observable):
     def key(self):
         """Wrapping self.meta.key."""
         return self._key
+
+    def rekey(self):
+        """Gets a new key for self."""
+        self._key = uuid.uuid1()
 
     @property
     def energy(self):
@@ -164,8 +245,8 @@ class Spectrum(Observable):
             self.energy,
             self.intensity
         )
-        LOGGER.debug("'{}' changed bg type to '{}'".format(self, value))
-        self._emit("changed-spectrum")
+        LOG.debug("'{}' changed bg type to '{}'".format(self, value))
+        self._emit("changed-spectrum", attr="background_type")
 
     @property
     def background_bounds(self):
@@ -184,15 +265,23 @@ class Spectrum(Observable):
         for bound in value:
             if bound > self.energy.max() or bound < self.energy.min():
                 raise ValueError("Background bound out of energy range.")
-        self._background_bounds = np.array(value)
+        self._background_bounds = np.array(sorted(list(value)))
+        self._background_bounds -= self._energy_calibration
         self._background = calculate_background(
             self.background_type,
             self.background_bounds,
             self.energy,
             self.intensity
         )
-        LOGGER.debug("'{}' changed bg bounds to '{}'".format(self, value))
-        self._emit("changed-spectrum")
+        LOG.debug("'{}' changed bg bounds to '{}'".format(self, value))
+        self._emit("changed-spectrum", attr="background_bounds")
+
+    def add_background_bounds(self, emin, emax):
+        """Adds one pair of background boundaries."""
+        if emin > emax:
+            emin, emax = emax, emin
+        old_bounds = self.background_bounds
+        self.background_bounds = np.append(old_bounds, [emin, emax])
 
     @property
     def energy_calibration(self):
@@ -205,8 +294,8 @@ class Spectrum(Observable):
         if abs(value) == np.inf:
             raise ValueError("Invalid energy calibration value 'np.inf'.")
         self._energy_calibration = value
-        LOGGER.debug("'{}' changed energy cal to '{}'".format(self, value))
-        self._emit("changed-spectrum")
+        LOG.debug("'{}' changed energy cal to '{}'".format(self, value))
+        self._emit("changed-spectrum", attr="energy_calibration")
 
     @property
     def normalization_type(self):
@@ -225,11 +314,11 @@ class Spectrum(Observable):
                 self.normalization_type,
                 self.normalization_divisor,
                 self.energy,
-                self.intensity
+                self._intensity
             )
             self._background *= old_divisor / self._normalization_divisor
-            LOGGER.debug("'{}' changed norm type to '{}'".format(self, value))
-        self._emit("changed-spectrum")
+            LOG.debug("'{}' changed norm type to '{}'".format(self, value))
+        self._emit("changed-spectrum", attr="normalization_type")
 
     @property
     def normalization_divisor(self):
@@ -245,8 +334,23 @@ class Spectrum(Observable):
         old_divisor = self._normalization_divisor
         self._normalization_divisor = value
         self._background *= old_divisor / self._normalization_divisor
-        LOGGER.debug("'{}' changed norm divisor to '{}'".format(self, value))
-        self._emit("changed-spectrum")
+        LOG.debug("'{}' changed norm divisor to '{}'".format(self, value))
+        self._emit("changed-spectrum", attr="normalization_divisor")
+
+    @property
+    def normalization_energy(self):
+        """Energy at which the normalization is done."""
+        return self._normalization_energy
+
+    @normalization_energy.setter
+    def normalization_energy(self, value):
+        """Setting this affects the divisor and type directly."""
+        self.normalization_divisor = intensity_at_energy(
+            self.energy,
+            self._intensity,
+            value
+        )
+        self._normalization_energy = value
 
 
 class SpectrumMeta(Observable):
@@ -271,8 +375,18 @@ class SpectrumMeta(Observable):
     def __setattr__(self, attr, value):
         super().__setattr__(attr, value)
         if self.__initialized and attr != "_SpectrumMeta__initialized":
-            LOGGER.debug("'{}' changed '{}' to '{}'".format(self, attr, value))
-            self._emit("changed-metadata")
+            LOG.debug("'{}' changed '{}' to '{}'".format(self, attr, value))
+            self._emit("changed-metadata", attr=attr, value=value)
+
+    def get(self, attr):
+        """Convenience method for getattr."""
+        if not hasattr(self, attr):
+            return None
+        return getattr(self, attr)
+
+    def set(self, attr, value):
+        """Convenience method for setattr."""
+        setattr(self, attr, value)
 
 
 class SpectrumModel(Observable):
@@ -322,7 +436,7 @@ class SpectrumModel(Observable):
         result = self.total_model.fit(intensity, self.params, x=energy)
         np.seterr(**old_settings)
         self.params.update(result.params)
-        LOGGER.debug("'{}' fitted".format(self))
+        LOG.debug("'{}' fitted".format(self))
         self._emit("changed-fit")
 
     def add_peak(self, name, **kwargs):
@@ -350,6 +464,7 @@ class SpectrumModel(Observable):
             par for par in self.params
             if re.match(r"{}_[a-z]+".format(peak.name), par)
         ]
+        self._stop_propagating_all(peak)
         self._peaks.pop(name)
         for par in pars_to_del:
             self.params.pop(par)
@@ -410,7 +525,7 @@ class Peak(Observable):
         self._smodel.params["{}_center".format(name)].set(
             value=abs(position), min=0
         )
-        LOGGER.debug("Peak '{}' created ({})".format(self.name, self))
+        LOG.debug("Peak '{}' created ({})".format(self.name, self))
 
     def get_intensity(self, energy):
         """Returns model intensity at given energy."""
@@ -431,7 +546,7 @@ class Peak(Observable):
                 if arg and abs(arg) > -1:         # fail if x is not number
                     pass
             except TypeError:
-                LOGGER.warning("Invalid constraint value '{}'".format(arg))
+                LOG.warning("Invalid constraint value '{}'".format(arg))
                 raise TypeError("Invalid constraint value '{}'".format(arg))
 
         if expr:
@@ -457,12 +572,12 @@ class Peak(Observable):
             except (SyntaxError, NameError, TypeError):
                 param_.set(expr="", **old_dict)
                 self._emit("changed-peak")
-                LOGGER.info("Invalid expression '{}'".format(expr))
+                LOG.info("Invalid expression '{}'".format(expr))
                 raise ValueError("Invalid expression '{}'".format(expr))
         elif expr == "":
             param_.set(expr="", vary=True)
         param_.set(min=min, max=max, vary=vary, value=value)
-        LOGGER.debug(
+        LOG.debug(
             "{} set '{}' constraints min {}, max {}, vary {}, value {},"
             "expr {}".format(self, param, min, max, vary, value, expr)
         )
