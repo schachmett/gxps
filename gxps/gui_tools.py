@@ -6,11 +6,12 @@ GTK classes representing data from a SpectrumContainer and the GUI state.
 # pylint: disable=logging-format-interpolation
 
 import logging
+import string
 
-from bidict import bidict
+from bidict import OrderedBidict
 
 from gxps import CONFIG
-from gxps.utility import Observable
+from gxps.utility import Observable, EventQueue
 
 
 LOG = logging.getLogger(__name__)
@@ -28,36 +29,50 @@ class GUIState(Observable):
         "changed-active",
         "changed-editing-spectra"
     )
+    peak_name_list = [
+        *list(string.ascii_uppercase),
+        *[i+b for i in string.ascii_uppercase for b in string.ascii_uppercase]
+    ]
     titles = {
-        "spectrum_view": bidict({
+        "spectrum_view": OrderedBidict({
             "name": "Name",
             "notes": "Notes"
         }),
-        "static_specinfo": bidict({
+        "peak_view": OrderedBidict({
+            "label": "Label",
+            "name": "Name",
+            "shape": "Shape",
+            "position": "Position",
+            "area": "Area",
+            "fwhm": "FWHM",
+            "alpha": "Alpha",
+            "beta": "Beta"
+        }),
+        "static_specinfo": OrderedBidict({
             "filename": "Filename"
         }),
-        "editing_dialog": bidict({
+        "editing_dialog": OrderedBidict({
             "name": "Name",
             "notes": "Notes",
             "pass_energy": "Pass Energy",
             "integration_time": "Time per Data Point",
             "sweeps": "Sweeps"
         }),
-        "norm_types": bidict({
+        "norm_types": OrderedBidict({
             "none": "none",
             "manual": "manual",
             "high_energy": "high energy background",
             "low_energy": "low energy background",
             "highest": "highest peak"
         }),
-        "norm_type_ids": bidict({
+        "norm_type_ids": OrderedBidict({
             "none": "0",
             "highest": "1",
             "high_energy": "2",
             "low_energy": "3",
             "manual": "4"
         }),
-        "photon_source_ids": bidict({
+        "photon_source_ids": OrderedBidict({
             "Al": "0",
             "Mg": "1"
         })
@@ -71,12 +86,15 @@ class GUIState(Observable):
         self._active_spectra = []
         self._editing_spectra = []
         self._active_peaks = []
+        self.peak_names = []
         # Project file-related
         self._current_project = ""
         self._project_isaltered = False
         # Spectrum Treeview-related
         self._spectra_tv_columns = ["name", "notes"]
         self._spectra_tv_filter = ["notes", None]
+        # Peak Trewwvie-related
+        self._peak_tv_columns = ["name", "label", "position", "fwhm", "area"]
         # Plotting-related
         self._rsf_elements = [""]
         self._photon_source = "Al"
@@ -112,6 +130,15 @@ class GUIState(Observable):
         self._active_spectra.clear()
         self._active_spectra.extend(spectra)
         self._emit("changed-active", attr="spectra")
+        # update active peaks:
+        peaks = self._active_peaks.copy()
+        for peak in self._active_peaks:
+            for spectrum in self._active_spectra:
+                if peak in spectrum.model.peaks:
+                    break
+            else:
+                peaks.remove(peak)
+        self.active_peaks = peaks
 
     @property
     def selected_spectra(self):
@@ -140,6 +167,15 @@ class GUIState(Observable):
         self._emit("changed-editing-spectra")
 
     @property
+    def visible_peaks(self):
+        """Currently visible peaks: the ones that belong to active spectra.
+        """
+        v_peaks = []
+        for spectrum in self.active_spectra:
+            v_peaks.extend(spectrum.model.peaks)
+        return v_peaks
+
+    @property
     def active_peaks(self):
         """Currently active peaks.
         """
@@ -163,18 +199,20 @@ class GUIState(Observable):
 
     def update_active(self, *_args):
         """Clean out active spectra/peaks that do not exist anymore."""
-        spectra = self._active_spectra.copy()
-        for spectrum in spectra:
-            if spectrum not in self._spectra.spectra:
-                spectra.remove(spectrum)
-        self.active_spectra = spectra
-        peaks = self._active_peaks.copy()
-        for peak in peaks:
+        with EventQueue("combine-all"):
+            spectra = self._active_spectra.copy()
             for spectrum in self._active_spectra:
-                if peak in spectrum.model.peaks:
-                    break
-            else:
-                peaks.remove(peak)
+                if spectrum not in self._spectra.spectra:
+                    spectra.remove(spectrum)
+            self.active_spectra = spectra
+            peaks = self._active_peaks.copy()
+            for peak in self._active_peaks:
+                for spectrum in self._active_spectra:
+                    if peak in spectrum.model.peaks:
+                        break
+                else:
+                    peaks.remove(peak)
+            self.active_peaks = peaks
 
     @property
     def current_project(self):
@@ -234,6 +272,12 @@ class GUIState(Observable):
             self._emit("changed-tv", attr="filter")
         except TypeError:
             LOG.error("Spectrum treeview filter '{}' invalid".format(value))
+
+    @property
+    def peak_tv_columns(self):
+        """Treeview columns for peaks view.
+        """
+        return self._peak_tv_columns.copy()
 
     @property
     def rsf_elements(self):

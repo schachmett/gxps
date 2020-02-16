@@ -13,6 +13,7 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk
 
 from gxps import CONFIG, COLORS
+from gxps.utility import EventQueue
 import gxps.io
 
 LOG = logging.getLogger(__name__)
@@ -281,7 +282,7 @@ class DataController():
         for spectrum in self._gui.active_spectra:
             if spectrum.normalization_type != "manual":
                 raise ValueError("Normalization is not set to manual")
-            spectrum.normalization_divisor = float(entry.get_text())
+            spectrum.normalization_divisor = 1 / float(entry.get_text())
 
 
 class FitController():
@@ -296,14 +297,131 @@ class FitController():
     def on_add_region(self, *_args):
         """Add two region boundaries to each of the active spectra."""
         def add_region(emin, emax):
-            """Callback for the SpanSelector."""
-            for spectrum in self._gui.active_spectra:
-                spectrum.background_type = "shirley"
-                spectrum.add_background_bounds(emin, emax)
+            """Add region"""
+            with EventQueue("combine-all"):
+                for spectrum in self._gui.active_spectra:
+                    spectrum.background_type = "shirley"
+                    spectrum.add_background_bounds(emin, emax)
         spanprops = {"edgecolor": COLORS["Plotting"]["region-vlines"], "lw": 2}
         navbar = self._app.builder.get_object("plot_toolbar")
         navbar.get_span(add_region, **spanprops)
 
+    def on_remove_region(self, *_args):
+        """Remove selected region."""
+        def remove_region(_x_0, _y_0, x_1, _y_1):
+            """Remove region"""
+            esel = x_1
+            with EventQueue("combine-all"):
+                for spectrum in self._gui.active_spectra:
+                    bg_bounds = spectrum.background_bounds.copy()
+                    for lower, upper in zip(bg_bounds[0::2], bg_bounds[1::2]):
+                        if esel >= lower and esel <= upper:
+                            spectrum.remove_background_bounds(lower, upper)
+        navbar = self._app.builder.get_object("plot_toolbar")
+        navbar.get_point(remove_region)
+
+    def on_add_peak(self, *_args):
+        """Add peak to active regions."""
+        def add_peak(position, height, angle):
+            """Create new peak from drawn parameters."""
+            for spectrum in self._gui.active_spectra:
+                height -= spectrum.background_of_E(position)
+                for pname in self._gui.peak_name_list:
+                    if pname not in self._gui.peak_names:
+                        name = pname
+                        break
+                self._gui.peak_names.append(name)
+                with EventQueue("combine-all"):
+                    spectrum.model.add_peak(
+                        name,
+                        position=position,
+                        angle=angle,
+                        height=height,
+                        shape="PseudoVoigt"
+                    )
+        wedgeprops = {}
+        navbar = self._app.builder.get_object("plot_toolbar")
+        navbar.get_wedge(add_peak, **wedgeprops)
+
+    def on_remove_peak(self, *_args):
+        """Remove active peak."""
+        with EventQueue("combine-all"):
+            for peak in self._gui.active_peaks:
+                peak.s_model.remove_peak(peak.name)
+                self._gui.peak_names.remove(peak.name)
+
+    def on_clear_peaks(self, *_args):
+        """Remove all peaks from active spectra."""
+        with EventQueue("combine-all"):
+            for spectrum in self._gui.selected_spectra:
+                for peak in spectrum.model.peaks:
+                    peak.s_model.remove_peak(peak.name)
+                    self._gui.peak_names.remove(peak.name)
+
+    def on_peak_entry_activate(self, *_args):
+        """Change the active peak's parameters."""
+        active_peaks = self._gui.active_peaks
+        if len(active_peaks) != 1:
+            return
+        peak = active_peaks[0]
+
+        position_entry = self._app.builder.get_object("peak_position_entry")
+        area_entry = self._app.builder.get_object("peak_area_entry")
+        fwhm_entry = self._app.builder.get_object("peak_fwhm_entry")
+        model_combo = self._app.builder.get_object("peak_model_combo")
+        alpha_entry = self._app.builder.get_object("peak_alpha_entry")
+
+        peak.shape = peak.shapes[model_combo.get_active()]
+        position_kwargs = self.parse_peak_entry(position_entry.get_text())
+        area_kwargs = self.parse_peak_entry(area_entry.get_text())
+        fwhm_kwargs = self.parse_peak_entry(fwhm_entry.get_text())
+        alpha_kwargs = self.parse_peak_entry(alpha_entry.get_text())
+
+        with EventQueue("combine-all"):
+            peak.set_constraint("position", **position_kwargs)
+            peak.set_constraint("area", **area_kwargs)
+            peak.set_constraint("fwhm", **fwhm_kwargs)
+            peak.set_constraint("alpha", **alpha_kwargs)
+
+    @staticmethod
+    def parse_peak_entry(param_string):
+        """Parse what is entered into a peak entry field."""
+        # return float(param_string)
+        kwargs = {}
+        # if not param_string:
+        #     self.dh.constrain_peak(peakID, param)
+        if "<" in param_string or ">" in param_string:
+            try:
+                kwargs["min"] = float(param_string.split(">")[1].split()[0])
+            except IndexError:
+                kwargs["min"] = None
+            try:
+                kwargs["max"] = float(param_string.split("<")[1].split()[0])
+            except IndexError:
+                kwargs["max"] = None
+            # self.dh.constrain_peak(peakID, param, min_=min_, max_=max_)
+        else:
+            try:
+                kwargs["value"] = float(param_string.strip())
+            except ValueError:
+                kwargs["expr"] = param_string.strip()
+                # self.dh.constrain_peak(peakID, param, expr=expr)
+            # else:
+            #     self.dh.constrain_peak(
+            #         peakID, param, vary=False, value=value
+            #     )
+        return kwargs
+
+    def on_peak_name_entry_changed(self, *_args):
+        """Change the active peak's name."""
+        active_peaks = self._gui.active_peaks
+        if len(active_peaks) != 1:
+            return
+        peak = active_peaks[0]
+
+        name_entry = self._app.builder.get_object("peak_name_entry")
+        name = name_entry.get_text()
+        peak.label = name
 
 
 class ViewController():
@@ -351,6 +469,13 @@ class ViewController():
             combo.get_active_text(),
             entry.get_text()
         )
+
+    def on_peak_view_row_activated(self, treeview, path, _col):
+        """Callback for row activation by Enter key or single click."""
+        model = treeview.get_model()
+        iter_ = model.get_iter(path)
+        peak = model.get(iter_, 0)[0]
+        self._gui.active_peaks = [peak]
 
     def on_show_rsfs(self, *_args):
         """Opens an RSF dialog."""

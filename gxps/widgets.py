@@ -14,7 +14,7 @@ from matplotlib.figure import Figure
 
 from gxps import COLORS, CONFIG, __appname__
 from gxps.gui_tools import GUIState
-from gxps.canvas_tools import PeakSelector, SpanSelector
+from gxps.canvas_tools import PeakSelector, SpanSelector, PointSelector
 
 
 LOG = logging.getLogger(__name__)
@@ -245,6 +245,11 @@ class GXPSPeakTreeStore(Gtk.TreeStore):
     """Treestore with peak information.
     """
     __gtype_name__ = "GXPSPeakTreeStore"
+    def __init__(self, *_args, **_kwargs):
+        titles = GUIState.titles["peak_view"]
+        # the first column is "is_actve"
+        types = [object] + [str] * len(titles)
+        super().__init__(*types)
 
 
 class GXPSSpectrumTreeStore(Gtk.TreeStore):
@@ -262,7 +267,7 @@ class Cursors():
     """Simple namespace for cursor reference.
     """
     # pylint: disable=too-few-public-methods
-    HAND, POINTER, SELECT_REGION, MOVE, WAIT, DRAG = list(range(6))
+    HAND, POINTER, SELECT_REGION, MOVE, WAIT, DRAG, DELETE = list(range(7))
 
 
 class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
@@ -281,7 +286,9 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
             self.cursors.POINTER: Gdk.Cursor.new(Gdk.CursorType.LEFT_PTR),
             self.cursors.SELECT_REGION: Gdk.Cursor.new(Gdk.CursorType.TCROSS),
             self.cursors.WAIT: Gdk.Cursor.new(Gdk.CursorType.WATCH),
-            self.cursors.DRAG: Gdk.Cursor.new(Gdk.CursorType.SB_H_DOUBLE_ARROW)
+            self.cursors.DRAG: Gdk.Cursor.new(
+                Gdk.CursorType.SB_H_DOUBLE_ARROW),
+            self.cursors.DELETE: Gdk.Cursor.new(Gdk.CursorType.X_CURSOR)
         }
         self._centerlims = [np.inf, -np.inf, np.inf, -np.inf]
 
@@ -312,6 +319,11 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
             useblit=True
         )
         self.peak_selector.active = False
+        self.point_selector = PointSelector(
+            self.canvas.figure.get_axes()[0],
+            lambda *args: None,
+        )
+        self.point_selector.active = False
 
     def _init_toolbar(self):
         """Normally, this would create the buttons and connect them to
@@ -335,6 +347,49 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
         for ax in self.canvas.figure.get_axes():
             ax.set_navigate_mode(self._active)
         self.set_message(self.mode)
+
+    def get_point(self, callback, onmove_callback=None):
+        """Gets a x, y point on the canvas and then calls
+        callback(x0, y0, x, y) where x0, y0 are the coords when pressing
+        the mouse and x, y are the coords when releasing.
+        """
+        if self._idPress is not None:
+            self._idPress = self.canvas.mpl_disconnect(self._idPress)
+            self.mode = ""
+        if self._idRelease is not None:
+            self._idRelease = self.canvas.mpl_disconnect(self._idRelease)
+            self.mode = ""
+
+        mode = callback.__doc__
+
+        self.release_all_tools()
+        if self._active == mode:
+            self._active = None
+            self.mode = ""
+            self.point_selector.active = False
+            self.set_message(self.mode)
+            return
+
+        self._active = mode
+        self.mode = mode
+        self.canvas.widgetlock(self.point_selector)
+        for ax in self.canvas.figure.get_axes():
+            ax.set_navigate_mode(None)
+        self.set_message(self.mode)
+
+        def on_selected(x0, y0, x, y):
+            """Callback caller."""
+            self._active = None
+            self.mode = ""
+            self.point_selector.active = False
+            self.release_all_tools()
+            self.set_message(self.mode)
+            self._set_cursor(event=None)
+            callback(x0, y0, x, y)
+
+        self.point_selector.onselect = on_selected
+        self.point_selector.onmove_callback = onmove_callback
+        self.point_selector.active = True
 
     def get_span(self, callback, **kwargs):
         """Gets a span and then calls callback(min, max). Also takes care
@@ -371,6 +426,7 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
             self.span_selector.active = False
             self.release_all_tools()
             self.set_message(self.mode)
+            self._set_cursor(event=None)
             callback(emin, emax)
         rectprops = {
             "alpha": 1,
@@ -419,6 +475,7 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
             self.peak_selector.active = False
             self.release_all_tools()
             self.set_message(self.mode)
+            self._set_cursor(event=None)
             callback(center, height, angle)
         wedgeprops = {
             "alpha": 0.5,
@@ -427,7 +484,7 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
             "linewidth": 1,
             "linestyle": "-"
         }
-        if kwargs["limits"]:
+        if "limits" in kwargs:
             self.peak_selector.set_limits(kwargs.pop("limits"))
         else:
             self.peak_selector.set_limits((-np.inf, np.inf))
@@ -526,7 +583,10 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
             try:
                 self.canvas.widgetlock.release(self.span_selector)
             except ValueError:
-                self.canvas.widgetlock.release(self.peak_selector)
+                try:
+                    self.canvas.widgetlock.release(self.peak_selector)
+                except ValueError:
+                    self.canvas.widgetlock.release(self.point_selector)
 
     def mouse_move(self, event):
         self._set_cursor(event)
@@ -544,7 +604,7 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
         Gtk.main_iteration()
 
     def _set_cursor(self, event):
-        if not event.inaxes or not self._active:
+        if not event or not event.inaxes or not self._active:
             if self._lastCursor != self.cursors.POINTER:
                 self.set_cursor(self.cursors.POINTER)
                 self._lastCursor = self.cursors.POINTER
@@ -561,6 +621,10 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
                   self._lastCursor != self.cursors.DRAG):
                 self.set_cursor(self.cursors.DRAG)
                 self._lastCursor = self.cursors.DRAG
+            elif (self._active == 'Remove region' and
+                  self._lastCursor != self.cursors.DELETE):
+                self.set_cursor(self.cursors.DELETE)
+                self._lastCursor = self.cursors.DELETE
             elif self._active == "Add peak":
                 lims = self.peak_selector.limits
                 if lims[0] < event.xdata < lims[1]:

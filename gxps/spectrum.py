@@ -1,6 +1,7 @@
 """Spectrum class represents spectrum data."""
 # pylint: disable=too-many-instance-attributes
 # pylint: disable=logging-format-interpolation
+# pylint: disable=invalid-name
 
 import logging
 import re
@@ -16,7 +17,9 @@ from gxps.processing import (
     calculate_background,
     make_equidistant,
     make_increasing,
-    calculate_normalization_divisor
+    calculate_normalization_divisor,
+    pah2fwhm,
+    pah2area
 )
 
 
@@ -31,7 +34,8 @@ class SpectrumContainer(Observable): #, Borg):
         "changed-spectrum",
         "changed-metadata",
         "changed-fit",
-        "changed-peak"
+        "changed-peak",
+        "changed-peak-meta"
     )
     def __init__(self, *args, **kwargs):
         self._spectra = {}
@@ -188,7 +192,7 @@ class Spectrum(Observable):
 
         self.meta = SpectrumMeta(**kwargs)
         self._start_propagating(self.meta, "changed-metadata")
-        self.model = SpectrumModel()
+        self.model = SpectrumModel(spectrum=self)
         self._start_propagating(self.model, "changed-fit")
         self._start_propagating(self.model, "changed-peak")
         LOG.debug(
@@ -222,6 +226,14 @@ class Spectrum(Observable):
     def intensity(self):
         """Intensity numpy array."""
         return self._intensity / self._normalization_divisor
+
+    def intensity_of_E(self, energy):
+        """Intensity at energy."""
+        return intensity_at_energy(self.energy, self.intensity, energy)
+
+    def background_of_E(self, energy):
+        """Intensity at energy."""
+        return intensity_at_energy(self.energy, self.background, energy)
 
     @property
     def background(self):
@@ -262,6 +274,9 @@ class Spectrum(Observable):
         """Only even-length numeral sequence-types are valid."""
         if len(value) % 2 != 0:
             raise ValueError("Background bounds must be pairwise.")
+        if not any(value):
+            self._background_bounds = np.array([])
+            self.background_type = "none"
         for bound in value:
             if bound > self.energy.max() or bound < self.energy.min():
                 raise ValueError("Background bound out of energy range.")
@@ -282,6 +297,13 @@ class Spectrum(Observable):
             emin, emax = emax, emin
         old_bounds = self.background_bounds
         self.background_bounds = np.append(old_bounds, [emin, emax])
+
+    def remove_background_bounds(self, emin, emax):
+        """Removes one pair of background boundaries."""
+        if emin > emax:
+            emin, emax = emax, emin
+        old_bounds = self.background_bounds.copy()
+        self.background_bounds = np.setdiff1d(old_bounds, [emin, emax])
 
     @property
     def energy_calibration(self):
@@ -394,9 +416,10 @@ class SpectrumModel(Observable):
     Holds information on the Fit and provides methods for fitting.
     """
 
-    def __init__(self):
+    def __init__(self, spectrum=None):
         super().__init__()
         self.params = Parameters()
+        self.spectrum = spectrum
         self._single_models = {}
         self._peaks = {}
 
@@ -410,7 +433,7 @@ class SpectrumModel(Observable):
         """Returns list of peak names."""
         return list(self._peaks.keys())
 
-    def get_intensity(self, energy):
+    def intensity_of_E(self, energy):
         """Returns model intensity at given energy."""
         old_settings = np.seterr(under="ignore")
         intensity = self.total_model.eval(params=self.params, x=energy)
@@ -447,9 +470,19 @@ class SpectrumModel(Observable):
         """
         if name in self._peaks:
             raise ValueError("Peak already exists")
+        if "fwhm" not in kwargs and "height" in kwargs and "angle" in kwargs:
+            kwargs["fwhm"] = pah2fwhm(
+                kwargs["position"], kwargs["angle"], kwargs["height"],
+                kwargs["shape"]
+                )
+        if "area" not in kwargs and "height" in kwargs:
+            kwargs["area"] = pah2area(
+                kwargs["position"], kwargs["angle"], kwargs["height"],
+                kwargs["shape"]
+                )
         peak = Peak(name, self, **kwargs)
         self._peaks[name] = peak
-        self._emit("changed-fit")
+        self._emit("changed-fit", attr="peaks")
         self._start_propagating(peak, "changed-peak")
         return peak
 
@@ -468,7 +501,7 @@ class SpectrumModel(Observable):
         self._peaks.pop(name)
         for par in pars_to_del:
             self.params.pop(par)
-        self._emit("changed-fit")
+        self._emit("changed-fit", attr="peaks")
 
     def __len__(self):
         return len(self._peaks)
@@ -486,14 +519,16 @@ class Peak(Observable):
     Provides read access to peak parameters and provides methods to
     constrain them.
     """
+    shapes = ["PseudoVoigt", "Doniach Sunjic", "Voigt"]
 
     def __init__(self, name, smodel, area=None, fwhm=None, position=None,
-                 alpha=0.2, shape="PseudoVoigt", **kwargs):
+                 alpha=0.5, shape="PseudoVoigt", **kwargs):
         # pylint: disable=too-many-arguments
         super().__init__()
         self.name = name
         self._smodel = smodel
         self._shape = shape
+        self._label = name
         if None in (area, fwhm, position):
             raise ValueError("Required attribute(s) missing")
 
@@ -507,6 +542,7 @@ class Peak(Observable):
             "area": "amplitude",
             "fwhm": "fwhm",
             "center": "center",
+            "position": "center",
             "fraction": "fraction"
         }
         if self._shape == "PseudoVoigt":
@@ -527,7 +563,35 @@ class Peak(Observable):
         )
         LOG.debug("Peak '{}' created ({})".format(self.name, self))
 
-    def get_intensity(self, energy):
+    def get(self, attr):
+        """Convenience method for getattr."""
+        if not hasattr(self, attr):
+            return None
+        return getattr(self, attr)
+
+    @property
+    def label(self):
+        """A label, for example denoting the core level."""
+        return self._label
+
+    @label.setter
+    def label(self, value):
+        """Emit a signal when changing the label."""
+        self._label = value
+        self._emit("changed-peak", attr="label", value=value)
+
+    @property
+    def intensity(self):
+        """Intensity array over whole energy range of parent spectrum."""
+        old_settings = np.seterr(under="ignore")
+        intensity = self._model.eval(
+            params=self._smodel.params,
+            x=self._smodel.spectrum.energy
+        )
+        np.seterr(**old_settings)
+        return intensity
+
+    def intensity_of_E(self, energy):
         """Returns model intensity at given energy."""
         old_settings = np.seterr(under="ignore")
         intensity = self._model.eval(params=self._smodel.params, x=energy)
@@ -612,9 +676,22 @@ class Peak(Observable):
         return self._model
 
     @property
+    def s_model(self):
+        """Returns SpectrumModel parent."""
+        return self._smodel
+
+    @property
     def shape(self):
         """Returns peak shape."""
         return self._shape
+
+    @shape.setter
+    def shape(self, value):
+        """Sets the peak shape."""
+        if value == "PseudoVoigt":
+            self._shape = value
+        else:
+            raise NotImplementedError
 
     @property
     def area(self):
@@ -653,12 +730,18 @@ class Peak(Observable):
         self._emit("changed-peak")
 
     @property
+    def alpha_name(self):
+        """Gives the name of the parameter alpha."""
+        if self.shape == "PseudoVoigt":
+            return "Alpha"
+        return None
+
+    @property
     def alpha(self):
         """Returns model specific value 1."""
         if self._shape == "PseudoVoigt":
             return self._smodel.params["{}_fraction".format(self.name)].value
-        else:
-            raise AttributeError("Shape {} has no alpha".format(self._shape))
+        return None
 
     @alpha.setter
     def alpha(self, value):
@@ -669,3 +752,13 @@ class Peak(Observable):
         else:
             raise AttributeError("Shape {} has no alpha".format(self._shape))
         self._emit("changed-peak")
+
+    @property
+    def beta_name(self):
+        """Gives the name of the parameter alpha."""
+        return None
+
+    @property
+    def beta(self):
+        """Returns model specific value 2."""
+        return None

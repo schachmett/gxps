@@ -9,12 +9,15 @@ import numpy as np
 
 LOG = logging.getLogger(__name__)
 
+s2 = np.sqrt(2)
+ln2 = 1 * np.log(2)
+sqrtln2 = np.sqrt(ln2)
 
 def calculate_background(bg_type, bg_bounds, energy, intensity):
     """Calculates a numpy array representing the background."""
     background = intensity.copy()
     if bg_type == "none":
-        return background
+        return np.zeros(energy.shape)
     if bg_bounds.size == 0:
         bg_bounds = [energy.min(), energy.max()]
     for lower, upper in zip(bg_bounds[0::2], bg_bounds[1::2]):
@@ -120,6 +123,24 @@ def calculate_normalization_divisor(norm_type, norm_div, _energy, intensity):
         ValueError("Invalid normalization type '{}'".format(norm_type))
     return new_divisor
 
+def pah2fwhm(_position, angle, height, shape):
+    """Calculates fwhm from position, angle, height depending on shape."""
+    if shape == "PseudoVoigt":
+        return np.tan(angle) * height
+    raise NotImplementedError
+
+def pah2area(_position, angle, height, shape):
+    """Calculates area from position, angle, height depending on shape."""
+    if shape == "PseudoVoigt":
+        fwhm = np.tan(angle) * height
+        area = (
+            height
+            * (fwhm * np.sqrt(np.pi / ln2))
+            / (1 + np.sqrt(1 / (np.pi * ln2)))
+        )
+        return area
+    raise NotImplementedError
+
 def is_equidistant(energy, tol=1e-08):
     """Returns True only when energy is equidistant."""
     spacings = np.unique(np.diff(energy))
@@ -138,7 +159,10 @@ def make_increasing(energy, intensity):
 def make_equidistant(energy, intensity):
     """Makes x, y pair so that x is equidistant."""
     spacings = np.unique(np.diff(energy))
-    #TODO what if spacings.min() is 0?
+    # try to eliminate spacings that are too small
+    while spacings:
+        if np.isclose(0, spacings.min()):
+            spacings.remove(spacings.min())
     if all([np.isclose(spacing, spacings[0]) for spacing in spacings]):
         return energy, intensity
     samples = int((energy.max() - energy.min()) / spacings.min())

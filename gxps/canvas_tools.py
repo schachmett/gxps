@@ -9,6 +9,78 @@ from matplotlib.patches import Rectangle, Wedge
 from matplotlib.transforms import blended_transform_factory
 
 
+class PointSelector(_SelectorWidget):
+    """Select a point on the canvas."""
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-instance-attributes
+    # pylint: disable=invalid-name
+    # pylint: disable=attribute-defined-outside-init
+    def __init__(self, ax, onselect, useblit=False, onmove_callback=None,
+                 button=None):
+        _SelectorWidget.__init__(
+            self, ax, onselect, useblit=useblit, button=button)
+
+        self.pressv = None
+
+        self.onmove_callback = onmove_callback
+
+        # Needed when dragging out of axes
+        self.prev = (0, 0)
+
+        # Reset canvas so that `new_axes` connects events.
+        self.canvas = None
+        self.new_axes(ax)
+
+    def new_axes(self, ax):
+        """Set SpanSelector to operate on a new Axes"""
+        self.ax = ax
+        if self.canvas is not ax.figure.canvas:
+            if self.canvas is not None:
+                self.disconnect_events()
+
+            self.canvas = ax.figure.canvas
+            self.connect_default_events()
+
+    def ignore(self, event):
+        """return *True* if *event* should be ignored"""
+        return _SelectorWidget.ignore(self, event) or not self.visible
+
+    def _press(self, event):
+        """on button press event"""
+        x0, y0 = self._get_data(event)
+        self.pressv = (x0, y0)
+        return False
+
+    def _release(self, event):
+        """on button release event"""
+        if self.pressv is None:
+            return True
+        self.buttonDown = False
+
+        x0, y0 = self.pressv
+
+        x, y = self._get_data(event)
+
+        self.onselect(x0, y0, x, y)
+        self.pressv = None
+        return False
+
+    def _onmove(self, event):
+        """on motion notify event"""
+        if self.pressv is None:
+            return True
+        x, y = self._get_data(event)
+        if x is None:
+            return True
+        x0, y0, = self.pressv
+
+        if self.onmove_callback is not None:
+            self.onmove_callback(x0, y0, x, y)
+
+        self.update()
+        return False
+
+
 class PeakSelector(_SelectorWidget):
     """Draw a Peak as triangle."""
     # pylint: disable=too-many-arguments

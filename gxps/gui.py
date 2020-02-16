@@ -14,6 +14,7 @@ from gi.repository import Gtk, Pango, GLib
 from gxps import __appname__, COLORS
 from gxps.utility import Event
 from gxps.io import get_element_rsfs
+from gxps.spectrum import Peak
 
 
 LOG = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ class ViewManager():
         self.window_vbehaviour = WindowBehaviour(app, gui, spectra)
         self.plot_vmanager = PlotManager(app, gui, spectra)
         self.spectrum_vmanager = SpectrumPanelManager(app, gui, spectra)
+        self.peak_vmanager = PeakPanelManager(app, gui, spectra)
         self.edit_vmanager = EditDialogManager(app, gui, spectra)
 
     @staticmethod
@@ -108,15 +110,17 @@ class PlotManager():
         self._gui.connect("changed-active", self.update, keepaxes=False)
         self._gui.connect("changed-rsf", self.update)
         self._spectra.connect("changed-spectrum", self.update)
+        self._spectra.connect("changed-fit", self.update)
+        self._spectra.connect("changed-peak", self.update)
 
     def update(self, event, keepaxes=True):
         """Updates plot by redrawing the whole thing. Relies on
         GUIState for information on what to plot. Designed as a
         callback function for when the plot should change.
         """
-        if event.signal == "changed-spectrum":
-            if event.source not in self._gui.active_spectra:
-                return
+        if event.signal == "changed-spectrum":      #TODO this clashes with Qs
+            # if event.source not in self._gui.active_spectra:
+            #     return
             if event.attr in ("normalization_type", "normalization_divisor"):
                 keepaxes = False
         # Save axis limits if needed, wipe the canvas and prepare for new
@@ -126,6 +130,7 @@ class PlotManager():
         self._ax.cla()
         self._canvas.reset_xy_centerlims()
         self._plot_spectra()
+        self._plot_peaks()
         self._plot_rsf()
         # Either restore axis limits or center plot.
         if keepaxes:
@@ -168,6 +173,37 @@ class PlotManager():
                 min(spectrum.intensity),
                 max(spectrum.intensity)
             )
+
+    def _plot_peaks(self):
+        inactive_color = COLORS["Plotting"]["peak"]
+        active_color = COLORS["Plotting"]["peak-active"]
+        for spectrum in self._gui.active_spectra:
+            for peak in spectrum.model.peaks:
+                line = {}
+                if peak in self._gui.active_peaks:
+                    line = {
+                        "color": active_color,
+                        "linewidth": 1,
+                        "linestyle": "--",
+                        "alpha": 0.2
+                    }
+                    self._ax.fill_between(
+                        spectrum.energy,
+                        spectrum.background + peak.intensity,
+                        spectrum.background,
+                        **line
+                    )
+                else:
+                    line = {
+                        "color": inactive_color,
+                        "linewidth": 1,
+                        "linestyle": "--",
+                    }
+                self._ax.plot(
+                    spectrum.energy,
+                    spectrum.background + peak.intensity,
+                    **line
+                )
 
     def _plot_rsf(self):
         element_colors = cycle(COLORS["Plotting"]["rsf-vlines"].split(","))
@@ -252,8 +288,9 @@ class SpectrumPanelManager():
         treestore.clear()
         for spectrum in self._spectra.spectra:
             row = [
-                str(spectrum.meta.get(meta_attr))
-                for meta_attr in self._gui.spectra_tv_columns
+                str(spectrum.meta.get(attr))
+                for attr in list(self._gui.titles["spectrum_view"].keys())
+                # for meta_attr in self._gui.spectra_tv_columns
             ]
             treestore.append(parent=None, row=[spectrum] + row)
         # reset selected spectra
@@ -299,7 +336,7 @@ class SpectrumPanelManager():
             if len(set(norm_divs)) > 1:
                 norm_entry.set_text("")
             else:
-                norm_entry.set_text("{:.2f}".format(norm_divs[0]))
+                norm_entry.set_text("{:.5f}".format(1 / norm_divs[0]))
             cals = [s.energy_calibration for s in active_spectra]
             if len(set(cals)) > 1:
                 cal_spinbutton.set_text("")
@@ -307,7 +344,7 @@ class SpectrumPanelManager():
             else:
                 cal_spinbutton.set_value(cals[0])
                 cal_caution.set_visible(False)
-                # TODO make manual normalization work correctly!
+                # is manual normalization working correctly?
 
     def _set_selection(self, spectra):
         """Selects rows representing spectra."""
@@ -334,13 +371,14 @@ class SpectrumPanelManager():
                 renderer.set_property("cell-background", lowlight_bg)
                 renderer.set_property("weight", Pango.Weight.NORMAL)
         # the other columns are simple, just apply the render_isplotted func
-        for i, meta_attr in enumerate(self._gui.spectra_tv_columns):
+        for attr in self._gui.spectra_tv_columns:
             renderer = Gtk.CellRendererText(xalign=0)
-            title = self._gui.titles["spectrum_view"][meta_attr]
-            # skip first two columns, they are "is_actve" and "spectrum"
-            column = Gtk.TreeViewColumn(title, renderer, text=i + 1)
+            title = self._gui.titles["spectrum_view"][attr]
+            # skip first column, it is "spectrum"
+            idx = list(self._gui.titles["spectrum_view"].keys()).index(attr)
+            column = Gtk.TreeViewColumn(title, renderer, text=idx + 1)
             column.set_cell_data_func(renderer, render_isplotted)
-            column.set_sort_column_id(i + 1)
+            column.set_sort_column_id(idx + 1)
             column.set_resizable(True)
             column.set_reorderable(True)
             treeview.append_column(column)
@@ -369,6 +407,156 @@ class SpectrumPanelManager():
             col_index = self._gui.spectra_tv_columns.index(meta_attr) + 1
             return re.match(regex, treemodel.get(iter_, col_index)[0])
         treemodelfilter.set_visible_func(filter_func)
+
+
+class PeakPanelManager():
+    """Manages representation of the peaks inside a treeview. Data
+    is pulled from the SpectrumContainer and user changeable representation
+    attributes are fetched from GUIState.
+    TODO: Manage the peak manipulation, e.g. manage constraints
+    """
+    def __init__(self, app, gui, spectra):
+        self._app = app
+        self._gui = gui
+        self._spectra = spectra
+
+        # tvmenu = self._app.builder.get_object("spectrum_view_context_menu")
+        # treeview = self._app.builder.get_object("peak_view")
+        # tvmenu.attach_to_widget(treeview, None)
+
+        self._make_columns()
+
+        self._spectra.connect("changed-spectra", self.update_data)
+        self._spectra.connect("changed-spectrum", self.update_data)
+        self._spectra.connect("changed-peak", self.update_data)
+        self._spectra.connect("changed-fit", self.update_data)
+        self._gui.connect("changed-active", self.update_data)
+        self._spectra.connect("changed-spectra", self.update_controls)
+        self._spectra.connect("changed-spectrum", self.update_controls)
+        self._spectra.connect("changed-peak", self.update_controls)
+        self._spectra.connect("changed-fit", self.update_controls)
+        self._gui.connect("changed-active", self.update_controls)
+
+        self.update_data(None)
+        self.update_controls(None)
+
+    def update_data(self, _event):
+        """Updates TreeModel with data from the SpectrumContainer.
+        To be used as callback function.
+        """
+        active_peaks = self._gui.active_peaks
+        # update model
+        treestore = self._app.builder.get_object("peak_treestore")
+        treestore.clear()
+        for spectrum in self._gui.active_spectra:
+            for peak in spectrum.model.peaks:
+                row = [
+                    self.format_peak_attr(peak, attr)
+                    for attr in list(self._gui.titles["peak_view"].keys())
+                ]
+                treestore.append(parent=None, row=[peak] + row)
+        # reset selected spectra
+        self._set_selection(active_peaks)
+
+    def update_controls(self, _event):
+        """Updates the entries representing peak parameters."""
+        active_peaks = self._gui.active_peaks
+        label_entry = self._app.builder.get_object("peak_name_entry")
+        position_entry = self._app.builder.get_object("peak_position_entry")
+        area_entry = self._app.builder.get_object("peak_area_entry")
+        fwhm_entry = self._app.builder.get_object("peak_fwhm_entry")
+        model_combo = self._app.builder.get_object("peak_model_combo")
+        alpha_label = self._app.builder.get_object("peak_alpha_label")
+        alpha_entry = self._app.builder.get_object("peak_alpha_entry")
+
+        if len(active_peaks) != 1:
+            label_entry.set_text("")
+            label_entry.set_sensitive(False)
+            position_entry.set_text("")
+            position_entry.set_sensitive(False)
+            area_entry.set_text("")
+            area_entry.set_sensitive(False)
+            fwhm_entry.set_text("")
+            fwhm_entry.set_sensitive(False)
+            model_combo.set_active_id(None)
+            model_combo.set_sensitive(False)
+            alpha_label.set_text("alpha")
+            alpha_entry.set_text("")
+            alpha_entry.set_sensitive(False)
+            return
+
+        peak = active_peaks[0]
+
+        label_entry.set_text(peak.label)
+        label_entry.set_sensitive(True)
+        position_entry.set_text(str(peak.position))
+        position_entry.set_sensitive(True)
+        area_entry.set_text(str(peak.area))
+        area_entry.set_sensitive(True)
+        fwhm_entry.set_text(str(peak.fwhm))
+        fwhm_entry.set_sensitive(True)
+
+        model_combo.remove_all()
+        for i, shape in enumerate(Peak.shapes):
+            model_combo.append_text(shape)
+            if shape == peak.shape:
+                model_combo.set_active(i)
+        model_combo.set_sensitive(True)
+        alpha_label.set_text(peak.alpha_name)
+        alpha_entry.set_text(str(peak.alpha))
+        alpha_entry.set_sensitive(True)
+
+    def format_peak_attr(self, peak, attr):
+        """Returns a string representing the peak's distinct attribute."""
+        value = peak.get(attr)
+        if attr in ["position", "fwhm", "area", "alpha", "beta"]:
+            if value is None:
+                return ""
+            return "{:.2f}".format(value)
+        if attr == "name":
+            if len(self._gui.active_spectra) >= 2:
+                value = "{p_name} ({s_name})".format(
+                    p_name=value,
+                    s_name=peak.s_model.spectrum.meta.name
+                )
+        return str(value)
+
+    def _set_selection(self, peaks):
+        """Selects rows representing spectra."""
+        selection = self._app.builder.get_object("peak_selection")
+        treemodelsort = self._app.builder.get_object("peak_sort_treestore")
+        selection.unselect_all()
+        for row in treemodelsort:
+            if row[0] in peaks:
+                selection.select_iter(row.iter)
+
+    def _make_columns(self):
+        # render function for making plotted spectra bold and light blue
+        treeview = self._app.builder.get_object("peak_view")
+        highlight_bg = COLORS["Treeview"]["tv-highlight-bg"]
+        lowlight_bg = treeview.style_get_property("even-row-color")
+        def render_isactive(_col, renderer, model, iter_, *_data):
+            """Renders the cell light blue if this peak is active."""
+            peak = model.get_value(iter_, 0)
+            if peak in self._gui.active_peaks:
+            # if model.get_value(iter_, 1):
+                renderer.set_property("cell-background", highlight_bg)
+                renderer.set_property("weight", Pango.Weight.BOLD)
+            else:
+                renderer.set_property("cell-background", lowlight_bg)
+                renderer.set_property("weight", Pango.Weight.NORMAL)
+        # the other columns are simple, just apply the render_isplotted func
+        for attr in self._gui.peak_tv_columns:
+            renderer = Gtk.CellRendererText(xalign=0)
+            title = self._gui.titles["peak_view"][attr]
+            # skip first column, it is "peak"
+            idx = list(self._gui.titles["peak_view"].keys()).index(attr)
+            column = Gtk.TreeViewColumn(title, renderer, text=idx + 1)
+            column.set_cell_data_func(renderer, render_isactive)
+            column.set_sort_column_id(idx + 1)
+            column.set_resizable(True)
+            column.set_reorderable(True)
+            treeview.append_column(column)
 
 
 class EditDialogManager():

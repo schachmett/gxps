@@ -9,6 +9,7 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gio, GLib
 
 from gxps import __appname__, __version__, ASSETDIR, CONFIG, COLORS
+from gxps.utility import EventQueue
 from gxps.spectrum import SpectrumContainer
 from gxps.gui_tools import GUIState
 from gxps.controller import Controller
@@ -53,16 +54,17 @@ class GXPS(Gtk.Application):
         LOG.debug("Activating application...")
         # load the last used project file
         fname = CONFIG["IO"]["current-project"]
-        if fname:
-            try:
-                self.controller.project.open(fname)
-            except FileNotFoundError:
-                LOG.warning("File '{}' not found".format(fname))
-                self.controller.project.new()
+        with EventQueue("combine-all"):
+            if fname:
+                try:
+                    self.controller.project.open(fname)
+                except FileNotFoundError:
+                    LOG.warning("File '{}' not found".format(fname))
+                    self.controller.project.new()
+                else:
+                    LOG.info("loaded file {}".format(fname))
             else:
-                LOG.info("loaded file {}".format(fname))
-        else:
-            self.controller.project.new()
+                self.controller.project.new()
 
     def do_startup(self):
         """Adds actions."""
@@ -87,8 +89,10 @@ class GXPS(Gtk.Application):
             "on_normalization_entry_activate":
                 self.controller.data.on_normalize_manual,
             "on_region_background_type_combo_changed": lambda *x: None,
-            "on_peak_entry_activate": lambda *x: None,
-            "on_peak_name_entry_changed": lambda *x: None,
+            "on_peak_entry_activate":
+                self.controller.fit.on_peak_entry_activate,
+            "on_peak_name_entry_changed":
+                self.controller.fit.on_peak_name_entry_changed,
             "on_spectrum_view_search_entry_changed":
                 self.controller.view.on_spectrum_view_filter_changed,
             "on_spectrum_view_search_combo_changed":
@@ -97,8 +101,9 @@ class GXPS(Gtk.Application):
                 self.controller.view.on_spectrum_view_clicked,
             "on_spectrum_view_row_activated":
                 self.controller.view.on_spectrum_view_row_activated,
-            "on_peak_view_row_activated": lambda *x: None,
-            "on_region_chooser_combo_changed": lambda *x: None
+            "on_peak_view_row_activated":
+                self.controller.view.on_peak_view_row_activated,
+            "on_spectrum_chooser_combo_changed": lambda *x: None
         }
         self.builder.connect_signals(handlers)
 
@@ -111,13 +116,13 @@ class GXPS(Gtk.Application):
             "import-spectra": self.controller.data.on_import,
             "remove-spectra": self.controller.data.on_remove_selected_spectra,
             "edit-spectra": self.controller.data.on_edit_spectra,
-            "remove-region": lambda *x: None,
+            "remove-region": self.controller.fit.on_remove_region,
             "clear-regions": lambda *x: None,
             "add-region": self.controller.fit.on_add_region,
-            "add-peak": lambda *x: None,
+            "add-peak": self.controller.fit.on_add_peak,
             "add-guessed-peak": lambda *x: None,
-            "remove-peak": lambda *x: None,
-            "clear-peaks": lambda *x: None,
+            "remove-peak": self.controller.fit.on_remove_peak,
+            "clear-peaks": self.controller.fit.on_clear_peaks,
             "avg-selected-spectra": lambda *x: None,
             "fit": lambda *x: None,
             "export-txt": lambda *x: None,
