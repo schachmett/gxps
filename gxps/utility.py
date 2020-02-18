@@ -2,195 +2,191 @@
 # pylint: disable=logging-format-interpolation
 
 import logging
-import uuid
 
 
 LOG = logging.getLogger(__name__)
 
 
-class Borg(object):
-    """Alternative to Singleton pattern: all instances have the same state."""
-    # pylint: disable=too-few-public-methods
-    __shared_state = {}
-    def __init__(self, *args, shared_state=None, **kwargs):
-        # pylint: disable=access-member-before-definition
-        super().__init__(*args, **kwargs)
-        if shared_state is None:
-            shared_state = self.__shared_state
-        if not shared_state:
-            shared_state.update(self.__dict__)
-        self.__dict__ = shared_state
-
-    @classmethod
-    def cleanup(cls):
-        """Cleans up the object. Mainly for testing."""
-        cls.__shared_state.clear()
-
-
 class Event:
-    """Stores variables during emitting."""
+    """Stores variables during emitting.
+    """
     # pylint: disable=too-few-public-methods
-    def __init__(self, **kwargs):
-        self.signal = "generic"
-        for attr, value in kwargs.items():
-            setattr(self, attr, value)
+    def __init__(self, signal):
+        self.properties = {}
 
-    def __getattr__(self, attr):
-        try:
-            return super().__getattr__(attr)
-        except AttributeError:
-            return None
+        self._signal = signal
+        self.source = []
+
+    @property
+    def signal(self):
+        """Expose the signal."""
+        return self._signal
 
 
-class EventQueue:
+class EventList(Event):
+    """A list of events that behaves like an event but has all the
+    childrens' attribute values.
+    """
+    # pylint: disable=too-few-public-methods
+    def __init__(self, eventlist):
+        self._list = eventlist
+        super().__init__(self._list[0].signal)
+        for event in self._list:
+            if event.signal != self._list[0].signal:
+                raise AttributeError("EventList has only one signal")
+            for prop in event.properties:
+                if prop not in self.properties:
+                    self.properties[prop] = []
+                if isinstance(event.properties[prop], list):
+                    self.properties[prop].extend(event.properties[prop])
+                else:
+                    self.properties[prop].append(event.properties[prop])
+            self.source.extend(event.source)
+
+
+class EventBus:
     """Context manager for queuing Events emitted by Observables so they
-    are not emitted multiple times by one method call."""
-    # pylint: disable=invalid-name
-    _event_keys = ["combine-all", "ignore-all"]
+    are not emitted multiple times by one method call.
+    """
+    _policies = [
+        "ignore",
+        "accumulate",
+        "fire"
+    ]
 
-    def __init__(self, event_key):
-        if event_key not in self._event_keys:
-            raise ValueError("Unknown Event Queue key")
-        self._event_key = event_key
-        self.signals = {}
-        self._active = False
+    def __init__(self, default_policy):
+        if default_policy not in self._policies:
+            raise ValueError("Unknown Event Queue policy")
+        self._policy = {"default": default_policy, "all": None}
+        self._subscribers = {}
+        self._queue = {}
 
-    def __enter__(self):
-        """Start holding off event firing."""
-        Observable.queues.append(self)
-        # when garbage collection is too slow, _active is needed (see __exit__)
-        self._active = True
+    def subscribe(self, callback, signal):
+        """Connects a callback to the queue.
+        """
+        if signal == "all":
+            raise ValueError("Cannot subscribe to all signals")
+        if signal not in self._subscribers:
+            self._subscribers[signal] = []
+        self._subscribers[signal].append(callback)
 
-    def add_signal(self, observable, event):
-        """Adds a Observable/Event pair to fire off in the end."""
-        if not self._active:
+    def unsubscribe(self, callback, signal="all"):
+        """Disconnects a callback from the queue, by default for all signals.
+        """
+        if signal == "all":
+            for sub_list in self._subscribers:
+                if callback in sub_list:
+                    sub_list.remove(callback)
+        else:
+            if callback in self._subscribers[signal]:
+                self._subscribers[signal].remove(callback)
+
+    def enqueue(self, event):
+        """Enqueues event.
+        """
+        LOG.debug("enqueue event with signal {}".format(event.signal))
+        policy = self._policy.get(event.signal, self._policy["default"])
+        if self._policy["all"]:
+            policy = self._policy["all"]
+
+        elif policy == "ignore":
             return
-        if event.signal not in self.signals:
-            self.signals[event.signal] = [(observable, event)]
+        if event.signal not in self._queue:
+            self._queue[event.signal] = []
+        self._queue[event.signal].append(event)
+        if "noqueue" in event.properties or policy == "fire":
+            self.fire(event.signal)
+
+    def fire(self, signal="all"):
+        """Fires all accumulated events of given signal.
+        """
+        if signal == "all":
+            for specific_signal in self._queue:
+                if specific_signal == "all":
+                    continue
+                self.fire(specific_signal)
         else:
-            self.signals[event.signal].append((observable, event))
+            LOG.debug("Fire signal {}".format(signal))
+            if signal not in self._queue or not self._queue[signal]:
+                return
+            event_list = EventList(self._queue[signal])
+            self._queue[signal].clear()
+            for callback in self._subscribers[signal]:
+                callback(event_list)
 
-    def deactivate(self):
-        """Prematurely deactivate the queue."""
-        self._active = False
+    def set_policy(self, policy, signal="all"):
+        """Sets a policy for how to act on incoming events.
+        """
+        if policy not in self._policies:
+            raise ValueError("Unknown Event Queue policy")
+        self._policy[signal] = policy
 
-    def activate(self):
-        """Activate the queue when it was deactivated manually."""
-        self._active = True
+    def get_policy(self, signal="all"):
+        """Get specific policy. Useful if it is unknown if the signal exists.
+        """
+        if signal not in self._policy:
+            return self._policy["default"]
+        return self._policy[signal]
 
-    def __exit__(self, _e_type, _e_val, _tb):
-        """Fire the collected events."""
-        # pylint: disable=attribute-defined-outside-init
-        # pylint: disable=protected-access
-        # self._active is set to false so that self.signals won't be altered
-        # when already exiting
-        self._active = False
-        if self._event_key == "combine-all":
-            print("SIGNALS: {}".format(len(self.signals)))
-            for signal in self.signals:
-                tuples = self.signals[signal]
-                observables = [tuple[0] for tuple in tuples]
-                events = [tuple[1] for tuple in tuples]
-                event = Event()
-                event.source = self
-                event.signal = signal
-                event.noqueue = True
-                event.queue_length = len(observables)
-                event.all_events = events
-                event.all_sources = observables
-                observables[0]._re_emit(event)
-            Observable.queues.remove(self)
-        else:
-            Observable.queues.remove(self)
 
 
 class Observable:
     """Provides methods for observing these objects via callbacks.
     """
-    _signals = (
-        "changed",
-        "changed-spectra",
-        "changed-spectrum",
-        "changed-metadata",
-        "changed-fit",
-        "changed-peak"
-    )
-    queues = []
+    # pylint: disable=invalid-name
+    _signals = ()
+    # _signals = (
+    #     "changed",
+    #     "changed-spectra",
+    #     "changed-spectrum",
+    #     "changed-metadata",
+    #     "changed-fit",
+    #     "changed-peak",
+    #     "changed-peak-meta"
+    # )
 
-    def __init__(self, *args, **kwargs):
-        self._observers = dict((signal, {}) for signal in self._signals)
-        self._propagators = {}
-        super().__init__(*args, **kwargs)
+    def __init__(self):
+        self._observers = dict((signal, dict()) for signal in self._signals)
+        self._queues = []
 
     @property
     def signals(self):
-        """Makes signals accessible."""
-        return self._signals
-
-    def connect(self, signal, cb_func, *args, **kwargs):
-        """Registers cb_func as a callback for the specified signal. signal
-        has to be in self._signals.
+        """Makes signals accessible.
         """
-        handler_id = uuid.uuid1()
-        if signal not in self._observers:
-            raise ValueError("Unknown signal '{}'".format(signal))
-        self._observers[signal][handler_id] = (cb_func, args, kwargs)
-        return handler_id
+        signals = list(self._signals).copy()
+        return signals
 
-    def disconnect(self, handler_id):
-        """Deregisters cb_func as a callback for the specified signal.
+    @property
+    def queues(self):
+        """Exposes queues.
         """
-        for signal in self._observers:
-            self._observers[signal].pop(handler_id, None)
+        return self.queues.copy()
 
-    def disconnect_all(self):
-        """Deregisters all cb_funcs.
+    def register_queue(self, queue):
+        """Registers a queue where events are sent to.
         """
-        for signal in self._observers:
-            self._observers[signal].clear()
+        self._queues.append(queue)
 
-    def _start_propagating(self, child, signal):
-        """Emit the same signal as child."""
-        handler_id = child.connect(signal, self._re_emit)
-        self._propagators[handler_id] = child
-        return handler_id
+    def unregister_queue(self, queue):
+        """Unregisters a queue.
+        """
+        self._queues.remove(queue)
 
-    def _re_emit(self, event):
-        kwargs = vars(event)
-        kwargs["re_emitted"] = True
-        signal = kwargs.pop("signal", None)
-        self._emit(signal, **kwargs)
+    def unregister_all_queues(self):
+        """Unregisters all queues.
+        """
+        self._queues.clear()
 
-    def _stop_propagating(self, handler_id):
-        """Stop re-emitting the signal from child."""
-        child = self._propagators.pop(handler_id)
-        child.disconnect(handler_id)
+    def emit(self, signal, **kwargs):
+        """Emit a signal: call all corresponding observers with an event
+        object as argument. Also make the propagators propagate.
+        """
+        if signal not in self._signals:
+            raise ValueError("{} cannot emit signal '{}'".format(self, signal))
+        event = Event(signal)
+        event.source.append(self)
+        for key, value in kwargs.items():
+            event.properties[key] = value
 
-    def _stop_propagating_all(self, child):
-        """Stop re-emitting all signals from child."""
-        handler_ids = []
-        for handler_id in self._propagators:
-            if self._propagators[handler_id] == child:
-                handler_ids.append(handler_id)
-        for handler_id in handler_ids:
-            self._stop_propagating(handler_id)
-
-    def _emit(self, signal, **attrs):
-        """Calls callbacks for signal signal."""
-        # pylint: disable=attribute-defined-outside-init
-        event = Event()
-        event.source = attrs.pop("source", self)
-        event.signal = attrs.pop("signal", signal)
-        for key, value in attrs.items():
-            setattr(event, key, value)
-        if not event.noqueue and self.queues:
-            LOG.debug("Queue signal {} by {} (re: {})".format(
-                signal, event.source, bool(event.re_emitted)))
-            for queue in self.queues:
-                queue.add_signal(self, event)
-            return
-        LOG.debug("Execute signal {} by {} (re: {}, Q: {})".format(
-            signal, event.source, bool(event.re_emitted), event.queue_length))
-        for handler_id in self._observers[signal]:
-            cb_func, args, kwargs = self._observers[signal][handler_id]
-            cb_func(event, *args, **kwargs)
+        for queue in self._queues:
+            queue.enqueue(event)

@@ -160,9 +160,8 @@ def make_equidistant(energy, intensity):
     """Makes x, y pair so that x is equidistant."""
     spacings = np.unique(np.diff(energy))
     # try to eliminate spacings that are too small
-    while spacings:
-        if np.isclose(0, spacings.min()):
-            spacings.remove(spacings.min())
+    while np.isclose(0, spacings.min()):
+        spacings.remove(spacings.min())
     if all([np.isclose(spacing, spacings[0]) for spacing in spacings]):
         return energy, intensity
     samples = int((energy.max() - energy.min()) / spacings.min())

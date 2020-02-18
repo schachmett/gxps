@@ -13,7 +13,7 @@ from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3
 from matplotlib.figure import Figure
 
 from gxps import COLORS, CONFIG, __appname__
-from gxps.gui_tools import GUIState
+from gxps.state import GUIState
 from gxps.canvas_tools import PeakSelector, SpanSelector, PointSelector
 
 

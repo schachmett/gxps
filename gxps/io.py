@@ -10,7 +10,7 @@ import copy
 
 import numpy as np
 
-from gxps import ASSETDIR
+from gxps import ASSETDIR, __version__
 
 
 LOG = logging.getLogger(__name__)
@@ -20,20 +20,34 @@ def load_project(fname):
     """Loads project file."""
     with open(fname, "rb") as pfile:
         state = pickle.load(pfile)
+    state = convert_older_version(state)
     return state
 
+def convert_older_version(state):
+    """If the project file has an older version, this should convert it.
+    """
+    if state[2] != __version__:
+        raise NotImplementedError
+    state.remove(state[2])
+    return state
 
 def save_project(fname, spectrum_container, gui_state):
     """Saves a StatefulSpectrumContainer as a file."""
     spectra = copy.copy(spectrum_container.spectra)
+    active_spectrum_idxs = []
+    for spectrum in gui_state.active_spectra:
+        s_idx = spectrum_container.spectra.index(spectrum)
+        active_spectrum_idxs.append(s_idx)
     for spectrum in spectra:
-        spectrum.disconnect_all()
-    active_spectrum_keys = [s.key for s in gui_state.active_spectra]
-    active_peak_keys = [p.key for p in gui_state.active_peaks]
+        spectrum.unregister_all_queues()
+        spectrum.meta.unregister_all_queues()
+        spectrum.model.unregister_all_queues()
+        for peak in spectrum.model.peaks:
+            peak.unregister_all_queues()
     state = [
         spectra,
-        active_spectrum_keys,
-        active_peak_keys
+        active_spectrum_idxs,
+        __version__
     ]
     with open(fname, "wb") as pfile:
         pickle.dump(state, pfile, pickle.HIGHEST_PROTOCOL)

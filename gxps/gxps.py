@@ -9,11 +9,11 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gio, GLib
 
 from gxps import __appname__, __version__, ASSETDIR, CONFIG, COLORS
-from gxps.utility import EventQueue
+from gxps.utility import EventBus
 from gxps.spectrum import SpectrumContainer
-from gxps.gui_tools import GUIState
+from gxps.state import GUIState
 from gxps.controller import Controller
-from gxps.gui import ViewManager
+from gxps.view import ViewManager
 
 import gxps.widgets         # pylint: disable=unused-import
 
@@ -37,6 +37,7 @@ class GXPS(Gtk.Application):
         self.builder.add_from_file(str(ASSETDIR / "gtk/gxps.glade"))
         self.builder.add_from_file(str(ASSETDIR / "gtk/menus.ui"))
 
+        self.bus = None
         self.win = None
         self.spectra = None
         self.gui = None
@@ -47,6 +48,7 @@ class GXPS(Gtk.Application):
             make_option("--verbosity", "-v", arg=GLib.OptionArg.INT,
                         description="Value from 1 (only errors) to 4 (debug)"),
             make_option("--version", description="show program version"),
+            make_option("--clean", description="don't load previous file")
         ])
 
     def do_activate(self):
@@ -54,17 +56,17 @@ class GXPS(Gtk.Application):
         LOG.debug("Activating application...")
         # load the last used project file
         fname = CONFIG["IO"]["current-project"]
-        with EventQueue("combine-all"):
-            if fname:
-                try:
-                    self.controller.project.open(fname)
-                except FileNotFoundError:
-                    LOG.warning("File '{}' not found".format(fname))
-                    self.controller.project.new()
-                else:
-                    LOG.info("loaded file {}".format(fname))
-            else:
+        # with EventQueue("combine-all"):
+        if fname:
+            try:
+                self.controller.project.open(fname)
+            except FileNotFoundError:
+                LOG.warning("File '{}' not found".format(fname))
                 self.controller.project.new()
+            else:
+                LOG.info("loaded file {}".format(fname))
+        else:
+            self.controller.project.new()
 
     def do_startup(self):
         """Adds actions."""
@@ -75,8 +77,11 @@ class GXPS(Gtk.Application):
         self.win.startup(app=self)
 
         # initialize all the state objects and workers
+        self.bus = EventBus(default_policy="fire")
         self.spectra = SpectrumContainer()
+        self.spectra.register_queue(self.bus)
         self.gui = GUIState(self, self.spectra)
+        self.gui.register_queue(self.bus)
         self.controller = Controller(self, self.gui, self.spectra)
         self.view_manager = ViewManager(self, self.gui, self.spectra)
 
@@ -166,6 +171,8 @@ class GXPS(Gtk.Application):
         if options.contains("version"):
             print("{} version: {}".format(__appname__, __version__))
             self.quit()
+        if options.contains("clean"):
+            CONFIG["IO"]["current-project"] = ""
         self.activate()
         return 0
 

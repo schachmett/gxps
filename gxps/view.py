@@ -60,7 +60,7 @@ class WindowBehaviour():
         self._win = self._app.builder.get_object("main_window")
         statusbar = self._app.builder.get_object("statusbar")
         self._statusbar_id = statusbar.get_context_id("")
-        self._gui.connect("changed-project", self.update_titlebar)
+        self._app.bus.subscribe(self.update_titlebar, "changed-project")
 
     def update_titlebar(self, _event):
         """Updates the title bar to show the current project."""
@@ -107,22 +107,29 @@ class PlotManager():
         self._ax = self._canvas.ax
         self._navbar = self._app.builder.get_object("plot_toolbar")
         # Connect to changes of the states
-        self._gui.connect("changed-active", self.update, keepaxes=False)
-        self._gui.connect("changed-rsf", self.update)
-        self._spectra.connect("changed-spectrum", self.update)
-        self._spectra.connect("changed-fit", self.update)
-        self._spectra.connect("changed-peak", self.update)
+        signals = (
+            "changed-active",
+            "changed-rsf",
+            "changed-spectrum",
+            "changed-fit",
+            "changed-peak"
+        )
+        for signal in signals:
+            self._app.bus.subscribe(self.update, signal)
 
     def update(self, event, keepaxes=True):
         """Updates plot by redrawing the whole thing. Relies on
         GUIState for information on what to plot. Designed as a
         callback function for when the plot should change.
         """
-        if event.signal == "changed-spectrum":      #TODO this clashes with Qs
+        if event.signal == "changed-spectrum":
             # if event.source not in self._gui.active_spectra:
             #     return
-            if event.attr in ("normalization_type", "normalization_divisor"):
-                keepaxes = False
+            for attr in event.properties["attr"]:
+                if attr in ("normalization_type", "normalization_divisor"):
+                    keepaxes = False
+        if event.signal == "changed-active":
+            keepaxes = False
         # Save axis limits if needed, wipe the canvas and prepare for new
         # centering axis limits.
         if keepaxes:
@@ -256,22 +263,27 @@ class SpectrumPanelManager():
 
         self._make_columns()
         self._setup_filter()
-        self.update_controls(Event())
+        self.update_controls(Event("dummy"))
 
-        self._spectra.connect("changed-spectrum", self.update_data)
-        self._spectra.connect("changed-metadata", self.update_data)
-        self._spectra.connect("changed-spectra", self.update_data)
-        self._gui.connect("changed-active", self.update_data)
-        self._gui.connect("changed-tv", self.update_filter)
-        self._spectra.connect("changed-spectrum", self.update_controls)
-        self._gui.connect("changed-active", self.update_controls)
+        signals = (
+            "changed-spectrum",
+            "changed-metadata",
+            "changed-spectra",
+            "changed-active"
+        )
+        for signal in signals:
+            self._app.bus.subscribe(self.update_data, signal)
+        self._app.bus.subscribe(self.update_filter, "changed-tv")
+        self._app.bus.subscribe(self.update_controls, "changed-spectrum")
+        self._app.bus.subscribe(self.update_controls, "changed-active")
 
     def update_filter(self, event):
         """Updates the filtering with filter parameters from GUIState.
         To be used as callback function.
         """
-        if event.signal == "changed-tv" and event.attr != "filter":
-            return
+        if event.signal == "changed-tv":
+            if "filter" not in event.properties["attr"]:
+                return
         treemodelfilter = self._app.builder.get_object(
             "spectrum_filter_treestore")
         treemodelfilter.refilter()
@@ -280,8 +292,9 @@ class SpectrumPanelManager():
         """Updates TreeModel with data from the SpectrumContainer.
         To be used as callback function.
         """
-        if event.signal == "changed-active" and event.attr != "spectra":
-            return
+        if event.signal == "changed-active":
+            if "spectra" not in event.properties["attr"]:
+                return
         selected_spectra = self._gui.selected_spectra
         # update model
         treestore = self._app.builder.get_object("spectrum_treestore")
@@ -290,7 +303,6 @@ class SpectrumPanelManager():
             row = [
                 str(spectrum.meta.get(attr))
                 for attr in list(self._gui.titles["spectrum_view"].keys())
-                # for meta_attr in self._gui.spectra_tv_columns
             ]
             treestore.append(parent=None, row=[spectrum] + row)
         # reset selected spectra
@@ -303,8 +315,9 @@ class SpectrumPanelManager():
         for example the updating of the value representation should not
         update the value itself again.
         """
-        if event.signal == "changed-active" and event.attr != "spectra":
-            return
+        if event.signal == "changed-active":
+            if "spectra" not in event.properties["attr"]:
+                return
         active_spectra = self._gui.active_spectra
         cal_spinbutton = self._app.builder.get_object("calibration_spinbutton")
         cal_caution = self._app.builder.get_object("cal_caution_image")
@@ -426,16 +439,27 @@ class PeakPanelManager():
 
         self._make_columns()
 
-        self._spectra.connect("changed-spectra", self.update_data)
-        self._spectra.connect("changed-spectrum", self.update_data)
-        self._spectra.connect("changed-peak", self.update_data)
-        self._spectra.connect("changed-fit", self.update_data)
-        self._gui.connect("changed-active", self.update_data)
-        self._spectra.connect("changed-spectra", self.update_controls)
-        self._spectra.connect("changed-spectrum", self.update_controls)
-        self._spectra.connect("changed-peak", self.update_controls)
-        self._spectra.connect("changed-fit", self.update_controls)
-        self._gui.connect("changed-active", self.update_controls)
+        signals = (
+            "changed-spectra",
+            "changed-spectrum",
+            "changed-peak",
+            "changed-fit",
+            "changed-active"
+        )
+        for signal in signals:
+            self._app.bus.subscribe(self.update_data, signal)
+            self._app.bus.subscribe(self.update_controls, signal)
+
+        # self._spectra.connect("changed-spectra", self.update_data)
+        # self._spectra.connect("changed-spectrum", self.update_data)
+        # self._spectra.connect("changed-peak", self.update_data)
+        # self._spectra.connect("changed-fit", self.update_data)
+        # self._gui.connect("changed-active", self.update_data)
+        # self._spectra.connect("changed-spectra", self.update_controls)
+        # self._spectra.connect("changed-spectrum", self.update_controls)
+        # self._spectra.connect("changed-peak", self.update_controls)
+        # self._spectra.connect("changed-fit", self.update_controls)
+        # self._gui.connect("changed-active", self.update_controls)
 
         self.update_data(None)
         self.update_controls(None)
@@ -568,7 +592,8 @@ class EditDialogManager():
         self._spectra = spectra
         self._dialog = self._app.builder.get_object("edit_spectrum_dialog")
         self._dialog.exclusion_key = self._exclusion_key
-        self._gui.connect("changed-editing-spectra", self.update_dialog)
+        self._app.bus.subscribe(self.update_dialog, "changed-editing-spectra")
+        # self._gui.connect("changed-editing-spectra", self.update_dialog)
 
     def update_dialog(self, *_args):
         """Updates the dialog to represent the spectra to be edited."""

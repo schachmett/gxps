@@ -13,7 +13,7 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk
 
 from gxps import CONFIG, COLORS
-from gxps.utility import EventQueue
+# from gxps.utility import EventQueue
 import gxps.io
 
 LOG = logging.getLogger(__name__)
@@ -22,10 +22,6 @@ LOG = logging.getLogger(__name__)
 class Controller():
     """Gets all user input and triggers the appropriate functions."""
     def __init__(self, app, gui, spectra):
-        self._app = app
-        self._gui = gui
-        self._spectra = spectra
-
         self.project = ProjectController(app, gui, spectra)
         self.data = DataController(app, gui, spectra)
         self.view = ViewController(app, gui, spectra)
@@ -71,8 +67,16 @@ class ProjectController():
         self._app = app
         self._gui = gui
         self._spectra = spectra
-        for signal in self._spectra.signals:
-            self._spectra.connect(signal, self.changed)
+        signals = (
+            "changed-spectra",
+            "changed-spectrum",
+            "changed-metadata",
+            "changed-fit",
+            "changed-peak",
+            "changed-peak-meta"
+        )
+        for signal in signals:
+            self._app.bus.subscribe(self.changed, signal)
 
     def changed(self, *_args):
         """Marks project as altered."""
@@ -101,23 +105,13 @@ class ProjectController():
 
     def open(self, fname, merge=False):
         """Load project file."""
-        spectra, active_s_keys, active_p_keys = gxps.io.load_project(fname)
+        spectra, active_idxs = gxps.io.load_project(fname)
         if not merge:
             self._spectra.clear_spectra()
         for spectrum in spectra:
             self._spectra.add_spectrum(spectrum)
         if not merge:
-            self._gui.active_spectra = [
-                spectrum
-                for spectrum in spectra
-                if spectrum.key in active_s_keys
-            ]
-            self._gui.active_peak = [
-                peak
-                for spectrum in self._gui.active_spectra
-                for peak in spectrum.model.peaks
-                if peak.key in active_p_keys
-            ]
+            self._gui.active_spectra = [spectra[idx] for idx in active_idxs]
             self._gui.current_project = fname
         LOG.info("Opened project file {}".format(fname))
 
@@ -298,10 +292,10 @@ class FitController():
         """Add two region boundaries to each of the active spectra."""
         def add_region(emin, emax):
             """Add region"""
-            with EventQueue("combine-all"):
-                for spectrum in self._gui.active_spectra:
-                    spectrum.background_type = "shirley"
-                    spectrum.add_background_bounds(emin, emax)
+            # with EventQueue("combine-all"):
+            for spectrum in self._gui.active_spectra:
+                spectrum.background_type = "shirley"
+                spectrum.add_background_bounds(emin, emax)
         spanprops = {"edgecolor": COLORS["Plotting"]["region-vlines"], "lw": 2}
         navbar = self._app.builder.get_object("plot_toolbar")
         navbar.get_span(add_region, **spanprops)
@@ -311,12 +305,12 @@ class FitController():
         def remove_region(_x_0, _y_0, x_1, _y_1):
             """Remove region"""
             esel = x_1
-            with EventQueue("combine-all"):
-                for spectrum in self._gui.active_spectra:
-                    bg_bounds = spectrum.background_bounds.copy()
-                    for lower, upper in zip(bg_bounds[0::2], bg_bounds[1::2]):
-                        if esel >= lower and esel <= upper:
-                            spectrum.remove_background_bounds(lower, upper)
+            # with EventQueue("combine-all"):
+            for spectrum in self._gui.active_spectra:
+                bg_bounds = spectrum.background_bounds.copy()
+                for lower, upper in zip(bg_bounds[0::2], bg_bounds[1::2]):
+                    if esel >= lower and esel <= upper:
+                        spectrum.remove_background_bounds(lower, upper)
         navbar = self._app.builder.get_object("plot_toolbar")
         navbar.get_point(remove_region)
 
@@ -331,32 +325,32 @@ class FitController():
                         name = pname
                         break
                 self._gui.peak_names.append(name)
-                with EventQueue("combine-all"):
-                    spectrum.model.add_peak(
-                        name,
-                        position=position,
-                        angle=angle,
-                        height=height,
-                        shape="PseudoVoigt"
-                    )
+                # with EventQueue("combine-all"):
+                spectrum.model.add_peak(
+                    name,
+                    position=position,
+                    angle=angle,
+                    height=height,
+                    shape="PseudoVoigt"
+                )
         wedgeprops = {}
         navbar = self._app.builder.get_object("plot_toolbar")
         navbar.get_wedge(add_peak, **wedgeprops)
 
     def on_remove_peak(self, *_args):
         """Remove active peak."""
-        with EventQueue("combine-all"):
-            for peak in self._gui.active_peaks:
-                peak.s_model.remove_peak(peak.name)
-                self._gui.peak_names.remove(peak.name)
+        # with EventQueue("combine-all"):
+        for peak in self._gui.active_peaks:
+            peak.s_model.remove_peak(peak.name)
+            self._gui.peak_names.remove(peak.name)
 
     def on_clear_peaks(self, *_args):
         """Remove all peaks from active spectra."""
-        with EventQueue("combine-all"):
-            for spectrum in self._gui.selected_spectra:
-                for peak in spectrum.model.peaks:
-                    peak.s_model.remove_peak(peak.name)
-                    self._gui.peak_names.remove(peak.name)
+        # with EventQueue("combine-all"):
+        for spectrum in self._gui.selected_spectra:
+            for peak in spectrum.model.peaks:
+                peak.s_model.remove_peak(peak.name)
+                self._gui.peak_names.remove(peak.name)
 
     def on_peak_entry_activate(self, *_args):
         """Change the active peak's parameters."""
@@ -377,11 +371,11 @@ class FitController():
         fwhm_kwargs = self.parse_peak_entry(fwhm_entry.get_text())
         alpha_kwargs = self.parse_peak_entry(alpha_entry.get_text())
 
-        with EventQueue("combine-all"):
-            peak.set_constraint("position", **position_kwargs)
-            peak.set_constraint("area", **area_kwargs)
-            peak.set_constraint("fwhm", **fwhm_kwargs)
-            peak.set_constraint("alpha", **alpha_kwargs)
+        # with EventQueue("combine-all"):
+        peak.set_constraint("position", **position_kwargs)
+        peak.set_constraint("area", **area_kwargs)
+        peak.set_constraint("fwhm", **fwhm_kwargs)
+        peak.set_constraint("alpha", **alpha_kwargs)
 
     @staticmethod
     def parse_peak_entry(param_string):

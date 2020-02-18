@@ -11,7 +11,7 @@ import string
 from bidict import OrderedBidict
 
 from gxps import CONFIG
-from gxps.utility import Observable, EventQueue
+from gxps.utility import Observable #, EventQueue
 
 
 LOG = logging.getLogger(__name__)
@@ -108,7 +108,7 @@ class GUIState(Observable):
             "show-rsfs": True
         }
         # Keep the active spectra up to date
-        self._spectra.connect("changed-spectra", self.update_active)
+        self._app.bus.subscribe(self.update_active, "changed-spectra")
 
         super().__init__()
 
@@ -129,7 +129,7 @@ class GUIState(Observable):
                 raise ValueError("Invalid spectrum activated.")
         self._active_spectra.clear()
         self._active_spectra.extend(spectra)
-        self._emit("changed-active", attr="spectra")
+        self.emit("changed-active", attr="spectra")
         # update active peaks:
         peaks = self._active_peaks.copy()
         for peak in self._active_peaks:
@@ -164,7 +164,7 @@ class GUIState(Observable):
                 raise ValueError("Invalid spectrum activated.")
         self._editing_spectra.clear()
         self._editing_spectra.extend(spectra)
-        self._emit("changed-editing-spectra")
+        self.emit("changed-editing-spectra")
 
     @property
     def visible_peaks(self):
@@ -195,24 +195,24 @@ class GUIState(Observable):
                 raise ValueError("Invalid peak activated.")
         self._active_peaks.clear()
         self._active_peaks.extend(peaks)
-        self._emit("changed-active", attr="peaks")
+        self.emit("changed-active", attr="peaks")
 
     def update_active(self, *_args):
         """Clean out active spectra/peaks that do not exist anymore."""
-        with EventQueue("combine-all"):
-            spectra = self._active_spectra.copy()
+        # with EventQueue("combine-all"):
+        spectra = self._active_spectra.copy()
+        for spectrum in self._active_spectra:
+            if spectrum not in self._spectra.spectra:
+                spectra.remove(spectrum)
+        self.active_spectra = spectra
+        peaks = self._active_peaks.copy()
+        for peak in self._active_peaks:
             for spectrum in self._active_spectra:
-                if spectrum not in self._spectra.spectra:
-                    spectra.remove(spectrum)
-            self.active_spectra = spectra
-            peaks = self._active_peaks.copy()
-            for peak in self._active_peaks:
-                for spectrum in self._active_spectra:
-                    if peak in spectrum.model.peaks:
-                        break
-                else:
-                    peaks.remove(peak)
-            self.active_peaks = peaks
+                if peak in spectrum.model.peaks:
+                    break
+            else:
+                peaks.remove(peak)
+        self.active_peaks = peaks
 
     @property
     def current_project(self):
@@ -226,12 +226,12 @@ class GUIState(Observable):
             self._current_project = "Untitled"
             CONFIG["IO"]["current-project"] = ""
             self._project_isaltered = False
-            self._emit("changed-project", attr="filename")
+            self.emit("changed-project", attr="filename")
         elif value != self._current_project:
             self._current_project = value
             CONFIG["IO"]["current-project"] = value
             self._project_isaltered = False
-            self._emit("changed-project", attr="filename")
+            self.emit("changed-project", attr="filename")
         else:
             self._project_isaltered = False
 
@@ -246,7 +246,7 @@ class GUIState(Observable):
         """Project was altered or saved."""
         if isaltered != self._project_isaltered:
             self._project_isaltered = isaltered
-            self._emit("changed-project", attr="isaltered")
+            self.emit("changed-project", attr="isaltered")
 
     @property
     def spectra_tv_columns(self):
@@ -269,7 +269,7 @@ class GUIState(Observable):
             meta_attr = self.titles["spectrum_view"].inverse[meta_attr_title]
             self._spectra_tv_filter[0] = meta_attr
             self._spectra_tv_filter[1] = search_term
-            self._emit("changed-tv", attr="filter")
+            self.emit("changed-tv", attr="filter")
         except TypeError:
             LOG.error("Spectrum treeview filter '{}' invalid".format(value))
 
@@ -289,7 +289,7 @@ class GUIState(Observable):
         """Set Elements for which RSF values should be plotted."""
         self._rsf_elements.clear()
         self._rsf_elements.extend(elements)
-        self._emit("changed-rsf", attr="elements")
+        self.emit("changed-rsf", attr="elements")
 
     @property
     def photon_source(self):
@@ -305,7 +305,7 @@ class GUIState(Observable):
     def photon_source(self, source):
         """Set photon source."""
         self._photon_source = source
-        self._emit("changed-rsf", attr="source")
+        self.emit("changed-rsf", attr="source")
 
     @property
     def plotting_options(self):
@@ -315,4 +315,4 @@ class GUIState(Observable):
     def set_plotting_option(self, **options):
         """Sets plotting options via keyword arguments."""
         self._plotting_options.update(options)
-        self._emit("changed-plotting-options")
+        self.emit("changed-plotting-options")
