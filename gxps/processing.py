@@ -13,6 +13,20 @@ s2 = np.sqrt(2)
 ln2 = 1 * np.log(2)
 sqrtln2 = np.sqrt(ln2)
 
+
+class IgnoreUnderflow:
+    """Context manager for suppressing numpy underflow runtime errors."""
+    # pylint: disable=too-few-public-methods
+    def __init__(self):
+        self.old_settings = {}
+
+    def __enter__(self):
+        self.old_settings = np.seterr(under="ignore")
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        np.seterr(**self.old_settings)
+
+
 def calculate_background(bg_type, bg_bounds, energy, intensity):
     """Calculates a numpy array representing the background."""
     background = intensity.copy()

@@ -64,6 +64,8 @@ def activate_logging():
                         "".format(type_.__name__, value, tbstring))
         sys.__excepthook__(type_, value, tb)
     sys.excepthook = exception_handler
+    file_handler = logging.getLogger("").handlers[1]
+    file_handler.doRollover()
 
 
 def logger_conf():
@@ -94,8 +96,8 @@ def logger_conf():
                 "level": "DEBUG",
                 "filename": LOG_PATH,
                 "formatter": "verbose",
-                "maxBytes": 2000000,
-                "backupCount": 3,
+                "maxBytes": 2000000,        # = 2MB
+                "backupCount": 5,
             },
         },
         "loggers": {

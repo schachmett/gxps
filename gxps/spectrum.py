@@ -8,10 +8,11 @@ import re
 
 import numpy as np
 from lmfit import Parameters
-from lmfit.models import PseudoVoigtModel
+from lmfit.models import PseudoVoigtModel, ConstantModel
 
-from gxps.utility import Observable
+from gxps.utility import Observable, MetaDataContainer
 from gxps.processing import (
+    IgnoreUnderflow,
     intensity_at_energy,
     calculate_background,
     make_equidistant,
@@ -34,7 +35,7 @@ class SpectrumContainer(Observable):
     def __init__(self, *args, **kwargs):
         self._spectra = []
         super().__init__(*args, **kwargs)
-        LOG.debug("{} created".format(self))
+        LOG.info("{} created".format(self))
 
     @property
     def spectra(self):
@@ -44,43 +45,42 @@ class SpectrumContainer(Observable):
     def add_spectrum(self, spectrum=None, **specdict):
         """Adds a spectrum."""
         if not spectrum:
-            spectrum = Spectrum(**specdict)
+            spectrum = ModeledSpectrum(**specdict)
         self._spectra.append(spectrum)
         # QODO
         spectrum.register_queue(self._queues[0])
-        spectrum.model.register_queue(self._queues[0])
-        spectrum.meta.register_queue(self._queues[0])
 
-        LOG.debug("Added spectrum {} to {}".format(spectrum, self))
+        LOG.info("Added spectrum {} to {}".format(spectrum, self))
         self.emit("changed-spectra")
         return spectrum
 
     def remove_spectrum(self, spectrum):
         """Removes a spectrum."""
-        LOG.debug("Removing spectrum {} from {}".format(spectrum, self))
+        LOG.info("Removing spectrum {} from {}".format(spectrum, self))
         self._spectra.remove(spectrum)
         self.emit("changed-spectra")
 
-    def clear_spectra(self):
+    def clear(self):
         """Clear all spectra from self."""
         self._spectra.clear()
-        LOG.debug("Cleared container {}".format(self))
+        LOG.info("Cleared container {}".format(self))
         self.emit("changed-spectra")
 
 
-class Spectrum(Observable):
+class Spectrum(Observable, MetaDataContainer):
     """
     Holds data from one single spectrum.
     """
-    _signals = ("changed-spectrum", )
-    _required = ("energy", "intensity")
+    _signals = ("changed-spectrum", "changed-spectrum-meta")
+    _required = ("energy", "intensity", "name", "filename", "notes")
     _bg_types = ("none", "linear", "shirley", "tougaard")
-    _norm_types = ("none", "manual", "highest", "high_energy", "low_energy")
+    _norm_types = ("none", "highest", "high_energy", "low_energy", "manual")
 
     def __init__(self, **kwargs):
-        super().__init__()
         if not all(a in kwargs for a in self._required):
             raise ValueError("Required attribute(s) missing")
+        super().__init__()
+        self._default_meta_value = ""
 
         energy = np.array(kwargs.pop("energy"))
         intensity = np.array(kwargs.pop("intensity"))
@@ -100,9 +100,20 @@ class Spectrum(Observable):
         self._normalization_divisor = 1.0
         self._normalization_energy = None
 
-        self.meta = SpectrumMeta(**kwargs)
-        self.model = SpectrumModel(spectrum=self)
-        LOG.debug("Spectrum '{}' created ({})".format(self.meta.name, self))
+        for key, value in kwargs.items():
+            self.set_meta(key, value, silent=True)
+
+        LOG.info("Spectrum '{}' created ({})".format(self.name, self))
+
+    def _set_meta(self, attr, value):
+        """Ensure that setting meta data creates an event."""
+        LOG.info("'{}' changes '{}' to '{}'".format(self, attr, value))
+        self.emit("changed-spectrum-meta", attr=attr, value=value)
+
+    @property
+    def name(self):
+        """Expose metadatum "name"."""
+        return self.get_meta("name")
 
     # Energy-related
     @property
@@ -131,7 +142,7 @@ class Spectrum(Observable):
         if abs(value) == np.inf:
             raise ValueError("Invalid energy calibration value 'np.inf'.")
         self._energy_calibration = value
-        LOG.debug("'{}' changed energy cal to '{}'".format(self, value))
+        LOG.info("'{}' changed energy cal to '{}'".format(self, value))
         self.emit("changed-spectrum", attr="energy_calibration")
 
     # Intensity-related
@@ -162,7 +173,7 @@ class Spectrum(Observable):
                 self.energy,
                 self._intensity
             )
-        LOG.debug("'{}' changed norm type to '{}'".format(self, value))
+        LOG.info("'{}' changed norm type to '{}'".format(self, value))
         self.emit("changed-spectrum", attr="normalization_type")
 
     @property
@@ -177,7 +188,7 @@ class Spectrum(Observable):
             raise ValueError("Invalid normalization divisor '0.0'")
         self._normalization_type = "manual"
         self._normalization_divisor = value
-        LOG.debug("'{}' changed norm divisor to '{}'".format(self, value))
+        LOG.info("'{}' changed norm divisor to '{}'".format(self, value))
         self.emit("changed-spectrum", attr="normalization_divisor")
 
     @property
@@ -222,7 +233,7 @@ class Spectrum(Observable):
             self.energy,
             self._intensity
         )
-        LOG.debug("'{}' changed bg type to '{}'".format(self, value))
+        LOG.info("'{}' changed bg type to '{}'".format(self, value))
         self.emit("changed-spectrum", attr="background_type")
 
     @property
@@ -252,7 +263,7 @@ class Spectrum(Observable):
             self.energy,
             self._intensity
         )
-        LOG.debug("'{}' changed bg bounds to '{}'".format(self, value))
+        LOG.info("'{}' changed bg bounds to '{}'".format(self, value))
         self.emit("changed-spectrum", attr="background_bounds")
 
     def add_background_bounds(self, emin, emax):
@@ -270,135 +281,102 @@ class Spectrum(Observable):
         self.background_bounds = np.setdiff1d(old_bounds, [emin, emax])
 
 
-
-class SpectrumMeta(Observable):
-    """Holds meta data of a spectrum.
-    """
-    _signals = ("changed-metadata", )
-    _required = ("filename", "name")
-    __initialized = False
-
-    def __init__(self, **kwargs):
-        self.__initialized = False
-
-        super().__init__()
-        if not all(a in kwargs for a in self._required):
-            raise ValueError("Required attribute(s) missing")
-
-        self.name = kwargs.pop("name")
-        self.filename = kwargs.pop("filename")
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-        self.__initialized = True
-
-    def __setattr__(self, attr, value):
-        super().__setattr__(attr, value)
-        if self.__initialized and attr != "_SpectrumMeta__initialized":
-            LOG.debug("'{}' changed '{}' to '{}'".format(self, attr, value))
-            self.emit("changed-metadata", attr=attr, value=value)
-
-    def get(self, attr):
-        """Convenience method for getattr."""
-        if not hasattr(self, attr):
-            return None
-        return getattr(self, attr)
-
-    def set(self, attr, value):
-        """Convenience method for setattr."""
-        setattr(self, attr, value)
-
-
-class SpectrumModel(Observable):
+class ModeledSpectrum(Spectrum):
     """Holds information on the Fit and provides methods for fitting.
     """
-    _signals = (
-        "changed-fit",
-    )
+    _signals = ("changed-fit", "changed-spectrum", "changed-spectrum-meta")
+    _required = ("energy", "intensity", "name", "filename", "notes")
+    _bg_types = ("none", "linear", "shirley", "tougaard")
+    _norm_types = ("none", "manual", "highest", "high_energy", "low_energy")
 
-    def __init__(self, spectrum=None):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
         self.params = Parameters()
-        self.spectrum = spectrum
-        self._peaks = {}
+        self._peaks = []
+        super().__init__(*args, **kwargs)
 
     @property
     def peaks(self):
-        """Returns peaks dictionary."""
-        return list(self._peaks.values())
+        """Returns peaks."""
+        return self._peaks.copy()
 
     @property
-    def peak_names(self):
-        """Returns list of peak names."""
-        return list(self._peaks.keys())
+    def fit(self):
+        """Returns fit result on whole energy range."""
+        with IgnoreUnderflow():
+            fit = self.model.eval(params=self.params, x=self.energy)
+        return fit
 
-    def intensity_of_E(self, energy):
+    def fit_of_E(self, energy):
         """Returns model intensity at given energy."""
-        old_settings = np.seterr(under="ignore")
-        intensity = self.total_model.eval(params=self.params, x=energy)
-        np.seterr(**old_settings)
-        return intensity
+        energy = np.array([energy])
+        with IgnoreUnderflow():
+            fit = self.model.eval(params=self.params, x=energy)
+        return fit
 
     @property
-    def total_model(self):
-        """Returns the sum of all models."""
-        if not self.peaks:
-            return None
-        model_list = [peak.model for peak in self._peaks.values()]
-        model_sum = model_list[0]
-        for i in range(1, len(model_list)):
-            model_sum += model_list[i]
-        return model_sum
+    def model(self):
+        """Returns the sum of all peak models."""
+        model = ConstantModel(prefix="BASE_")
+        model.set_param_hint("c", vary=False, value=0)
+        self.params += model.make_params()
 
-    def fit(self, energy, intensity):
+        for peak in self._peaks:
+            model += peak.model
+        return model
+
+    def do_fit(self):
         """Returns the fitted cps values."""
-        if not self._peaks:
-            return
-        old_settings = np.seterr(under="ignore")    # ignore underflow error
-        result = self.total_model.fit(intensity, self.params, x=energy)
-        np.seterr(**old_settings)
+        with IgnoreUnderflow():
+            result = self.model.fit(
+                self.intensity - self.background,
+                self.params,
+                x=self.energy
+            )
         self.params.update(result.params)
-        LOG.debug("'{}' fitted".format(self))
+        LOG.info("'{}' fitted".format(self))
         self.emit("changed-fit")
 
     def add_peak(self, name, **kwargs):
         """
-        Add a peak with given parameters. Valid parameters: area,
-        fwhm, position and model specific parameters:
-        PseudoVoigt: fraction, gausswidth
+        Add a peak with given parameters. Valid parameters:
+        area, fwhm, position and model specific parameters:
+            PseudoVoigt: fraction, gausswidth
         """
-        if name in self._peaks:
+        if name in [peak.name for peak in self._peaks]:
             raise ValueError("Peak already exists")
         if "fwhm" not in kwargs and "height" in kwargs and "angle" in kwargs:
             kwargs["fwhm"] = pah2fwhm(
-                kwargs["position"], kwargs["angle"], kwargs["height"],
+                kwargs["position"],
+                kwargs["angle"],
+                kwargs["height"],
                 kwargs["shape"]
                 )
         if "area" not in kwargs and "height" in kwargs:
             kwargs["area"] = pah2area(
-                kwargs["position"], kwargs["angle"], kwargs["height"],
+                kwargs["position"],
+                kwargs["angle"],
+                kwargs["height"],
                 kwargs["shape"]
                 )
         kwargs.pop("angle", None)
         kwargs.pop("height", None)
         peak = Peak(name, self, **kwargs)
-        self._peaks[name] = peak
-        self.emit("changed-fit", attr="peaks")
+        self._peaks.append(peak)
         peak.register_queue(self._queues[0])
+        self.emit("changed-fit", attr="peaks")
         return peak
 
     def add_guessed(self, name):
         """Add a peak while guessing parameters."""
         raise NotImplementedError
 
-    def remove_peak(self, name):
+    def remove_peak(self, peak):
         """Remove a peak specified by its name."""
-        peak = self._peaks[name]
         pars_to_del = [
             par for par in self.params
             if re.match(r"{}_[a-z]+".format(peak.name), par)
         ]
-        self._peaks.pop(name)
+        self._peaks.remove(peak)
         for par in pars_to_del:
             self.params.pop(par)
         self.emit("changed-fit", attr="peaks")
@@ -411,17 +389,22 @@ class Peak(Observable):
     """
     _signals = (
         "changed-peak",
+        "changed-peak-meta"
     )
     shapes = ["PseudoVoigt", "Doniach Sunjic", "Voigt"]
 
-    def __init__(self, name, smodel, area=None, fwhm=None, position=None,
-                 alpha=0.5, shape="PseudoVoigt"):
+    def __init__(
+            self, name, spectrum,
+            area=None, fwhm=None, position=None,
+            shape="PseudoVoigt", alpha=0.5, beta=None
+        ):
         # pylint: disable=too-many-arguments
         super().__init__()
         self.name = name
-        self._smodel = smodel
+        self.spectrum = spectrum
+        self.params = spectrum.params
         self._shape = shape
-        self._label = name
+        self._label = "Peak {}".format(name)
         if None in (area, fwhm, position):
             raise ValueError("Required attribute(s) missing")
 
@@ -429,38 +412,38 @@ class Peak(Observable):
             self._model = PseudoVoigtModel(prefix="{}_".format(name))
             self._model.set_param_hint("fraction", vary=False, value=alpha)
         else:
+            self._model = (beta, )
             raise NotImplementedError("Only PseudoVoigt shape supported")
 
         self.param_aliases = {
             "area": "amplitude",
             "fwhm": "fwhm",
-            "center": "center",
-            "position": "center",
-            "fraction": "fraction"
+            "position": "center"
         }
         if self._shape == "PseudoVoigt":
             self.param_aliases["alpha"] = "fraction"
+            self.param_aliases["beta"] = None
 
-        self._smodel.params += self._model.make_params()
-        self._smodel.params["{}_fwhm".format(name)].set(
-            value=abs(fwhm), vary=True, min=0
-        )
-        self._smodel.params["{}_sigma".format(name)].set(
-            expr="{}_fwhm/2".format(name)
-        )
-        self._smodel.params["{}_amplitude".format(name)].set(
-            value=abs(area), min=0
-        )
-        self._smodel.params["{}_center".format(name)].set(
-            value=abs(position), min=0
-        )
-        LOG.debug("Peak '{}' created ({})".format(self.name, self))
+        self.params += self._model.make_params()
+        # self.params["{}_fwhm".format(name)].set(
+        #     value=abs(fwhm), vary=True, min=0
+        # )
+        self.get_param("fwhm").set(value=abs(fwhm), vary=True, min=0)
+        self.get_param("sigma").set(expr="{}_fwhm/2".format(name))
+        self.get_param("amplitude").set(value=abs(area), min=0)
+        self.get_param("center").set(value=abs(position), min=0)
+        LOG.info("Peak '{}' created ({})".format(self.name, self))
 
-    def get(self, attr):
-        """Convenience method for getattr."""
-        if not hasattr(self, attr):
-            return None
-        return getattr(self, attr)
+    def get_param(self, param_name):
+        """Shortcut for getting the Parameter object called
+        "peak.name_param_name"
+        """
+        return self.params["{}_{}".format(self.name, param_name)]
+
+    @property
+    def model(self):
+        """Returns model."""
+        return self._model
 
     @property
     def label(self):
@@ -471,107 +454,122 @@ class Peak(Observable):
     def label(self, value):
         """Emit a signal when changing the label."""
         self._label = value
-        self.emit("changed-peak", attr="label", value=value)
+        self.emit("changed-peak-meta", attr="label", value=value)
 
     @property
     def intensity(self):
         """Intensity array over whole energy range of parent spectrum."""
-        old_settings = np.seterr(under="ignore")
-        intensity = self._model.eval(
-            params=self._smodel.params,
-            x=self._smodel.spectrum.energy
-        )
-        np.seterr(**old_settings)
+        with IgnoreUnderflow():
+            intensity = self._model.eval(
+                params=self.params,
+                x=self.spectrum.energy
+            )
         return intensity
 
     def intensity_of_E(self, energy):
         """Returns model intensity at given energy."""
-        old_settings = np.seterr(under="ignore")
-        intensity = self._model.eval(params=self._smodel.params, x=energy)
-        np.seterr(**old_settings)
+        with IgnoreUnderflow():
+            intensity = self._model.eval(params=self.params, x=energy)
         return intensity
 
-    def set_constraint(self, param, value=None, vary=None, min=None,
-                       max=None, expr=None):
-        """Sets a constraint for param."""
+    def set_constraint(
+            self, param_alias,
+            value=None, vary=None, min=None, max=None, expr=None
+        ):
+        """Sets a constraint for param. None values will unset the constraint.
+        """
         # pylint: disable=too-many-arguments
         # pylint: disable=redefined-builtin
-        paramname = "{}_{}".format(self.name, self.param_aliases[param])
-        param_ = self._smodel.params[paramname]
+        param_name = self.param_aliases[param_alias]
+        if param_name is None:
+            raise ValueError(
+                "{}s model '{}' does not support Parameter '{}'"
+                "".format(self, self.shape, param_alias)
+            )
+        param = self.get_param(param_name)
+        old_par = self.get_constraints(param_alias)
+
         for arg in (value, vary, min, max):
             try:
-                if arg and abs(arg) > -1:         # fail if x is not number
+                if arg and abs(arg) > -1:  # fail if x is not in (None, number)
                     pass
             except TypeError:
                 LOG.warning("Invalid constraint value '{}'".format(arg))
                 raise TypeError("Invalid constraint value '{}'".format(arg))
 
-        if expr:
-            def name_repl(matchobj):
-                """Replaces 'peakname' by 'peakname_param'"""
-                name = matchobj.group(0)
-                if name == self.name:
-                    raise ValueError("Own name inside expression")
-                if name in self._smodel.peak_names:
-                    return "{}_{}".format(name, self.param_aliases[param])
-                return name
-            expr = re.sub(r"\b[A-Za-z][A-Za-z0-9]*", name_repl, expr)
+        if min is None:
+            min = 0
+        if max is None:
+            max = np.inf
+        if vary is None:
+            vary = value is None
 
-            old_dict = {
-                "value": param_.value,
-                "min": param_.min,
-                "max": param_.max,
-                "vary": param_.vary
-            }
+        param.set(min=min, max=max, vary=vary, value=value, expr="")
+
+        if expr is not None:
+            expr = self.relation2expr(expr, param_name)
             try:
-                param_.set(expr=expr, min=-np.inf, max=np.inf)
-                self._smodel.params.valuesdict()
+                param.set(expr=expr, min=-np.inf, max=np.inf)
+                self.params.valuesdict()
             except (SyntaxError, NameError, TypeError):
-                param_.set(expr="", **old_dict)
+                old_par["expr"] = ""
+                param.set(**old_par)
                 self.emit("changed-peak")
-                LOG.info("Invalid expression '{}'".format(expr))
-                raise ValueError("Invalid expression '{}'".format(expr))
-        elif expr == "":
-            param_.set(expr="", vary=True)
-        param_.set(min=min, max=max, vary=vary, value=value)
-        LOG.debug(
-            "{} set '{}' constraints min {}, max {}, vary {}, value {},"
-            "expr {}".format(self, param, min, max, vary, value, expr)
-        )
+                LOG.warning("Invalid expression '{}'".format(expr))
+
+        LOG.info("Fit parameter set to '{}'".format(param))
         self.emit("changed-peak")
 
-    def get_constraint(self, param, constraint):
+    def get_constraints(self, param_alias):
         """Returns a string containing min/max or expr."""
-        paramname = "{}_{}".format(self.name, self.param_aliases[param])
-        if constraint == "min":
-            return self._smodel.params[paramname].min
-        if constraint == "max":
-            return self._smodel.params[paramname].max
-        if constraint == "vary":
-            return self._smodel.params[paramname].vary
-        if constraint == "expr":
-            def param_repl(matchobj):
-                """Replaces 'peakname_param' by 'peakname'"""
-                param_name = matchobj.group(0)
-                name = param_name.split("_")[0]
-                if name == self.name:
-                    raise ValueError("Own name inside expression")
-                if name in self._smodel.peak_names:
-                    return name
-                return param_name
-            expr = self._smodel.params[paramname].expr
-            return re.sub(r"\b[A-Za-z][A-Za-z0-9]*_[a-z]+", param_repl, expr)
-        raise ValueError("Constraint '{}' does not exist".format(constraint))
+        param_name = self.param_aliases[param_alias]
+        if param_name is None:
+            return None
+        param = self.get_param(param_name)
 
-    @property
-    def model(self):
-        """Returns model."""
-        return self._model
+        relation = ""
+        if param.expr is not None:
+            relation = self.expr2relation(param.expr)
+        constraints = {
+            "value": param.value,
+            "min": param.min,
+            "max": param.max,
+            "vary": param.vary,
+            "expr": relation
+        }
+        return constraints
 
-    @property
-    def s_model(self):
-        """Returns SpectrumModel parent."""
-        return self._smodel
+    def expr2relation(self, expr):
+        """Translates technical expr string into a human-readable relation.
+        """
+        def param_repl(matchobj):
+            """Replaces 'peakname_param' by 'peakname'"""
+            param_key = matchobj.group(0)
+            name = param_key.split("_")[0]
+            if self in self.spectrum.peaks:
+                return name
+            return param_key
+        regex = r"\b[A-Za-z][A-Za-z0-9]*_[a-z]+"
+        relation = re.sub(regex, param_repl, expr)
+        return relation
+
+    def relation2expr(self, relation, param_name):
+        """Translates a human-readable arithmetic relation to an expr string.
+        """
+        def name_repl(matchobj):
+            """Replaces 'peakname' by 'peakname_param' (searches
+            case-insensitive).
+            """
+            name = matchobj.group(0)
+            name = name.upper()
+            if name == self.name.upper():
+                raise ValueError("Self-reference in peak constraint")
+            if name in [peak.name.upper() for peak in self.spectrum.peaks]:
+                return "{}_{}".format(name, param_name)
+            return name
+        regex = r"\b[A-Za-z][A-Za-z0-9]*"
+        expr = re.sub(regex, name_repl, relation)
+        return expr
 
     @property
     def shape(self):
@@ -589,36 +587,36 @@ class Peak(Observable):
     @property
     def area(self):
         """Returns area value."""
-        return self._smodel.params["{}_amplitude".format(self.name)].value
+        return self.params["{}_amplitude".format(self.name)].value
 
     @area.setter
     def area(self, value):
         """Set area value."""
-        param = self._smodel.params["{}_amplitude".format(self.name)]
+        param = self.params["{}_amplitude".format(self.name)]
         param.set(value=value)
         self.emit("changed-peak")
 
     @property
     def fwhm(self):
         """Returns fwhm value."""
-        return self._smodel.params["{}_fwhm".format(self.name)].value
+        return self.params["{}_fwhm".format(self.name)].value
 
     @fwhm.setter
     def fwhm(self, value):
         """Sets peak width."""
-        param = self._smodel.params["{}_fwhm".format(self.name)]
+        param = self.params["{}_fwhm".format(self.name)]
         param.set(value=value)
         self.emit("changed-peak")
 
     @property
     def position(self):
         """Returns position value."""
-        return self._smodel.params["{}_center".format(self.name)].value
+        return self.params["{}_center".format(self.name)].value
 
     @position.setter
     def position(self, value):
         """Sets peak position."""
-        param = self._smodel.params["{}_center".format(self.name)]
+        param = self.params["{}_center".format(self.name)]
         param.set(value=value)
         self.emit("changed-peak")
 
@@ -633,14 +631,14 @@ class Peak(Observable):
     def alpha(self):
         """Returns model specific value 1."""
         if self._shape == "PseudoVoigt":
-            return self._smodel.params["{}_fraction".format(self.name)].value
+            return self.params["{}_fraction".format(self.name)].value
         return None
 
     @alpha.setter
     def alpha(self, value):
         """Sets model specific value 1."""
         if self._shape == "PseudoVoigt":
-            param = self._smodel.params["{}_fraction".format(self.name)]
+            param = self.params["{}_fraction".format(self.name)]
             param.set(value=value)
         else:
             raise AttributeError("Shape {} has no alpha".format(self._shape))

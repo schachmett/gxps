@@ -12,9 +12,9 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Pango, GLib
 
 from gxps import __appname__, COLORS
-from gxps.utility import Event
 from gxps.io import get_element_rsfs
 from gxps.spectrum import Peak
+from gxps.canvas_tools import DraggableVLine
 
 
 LOG = logging.getLogger(__name__)
@@ -97,6 +97,7 @@ class PlotManager():
     """Draws the spectra onto the canvas. Listens to GUIState for what
     exactly to draw.
     """
+    # pylint: disable=too-many-instance-attributes
     def __init__(self, app, gui, spectra):
         self._app = app
         self._gui = gui
@@ -105,6 +106,7 @@ class PlotManager():
         self._canvas = self._app.builder.get_object("main_canvas")
         self._figure = self._canvas.figure
         self._ax = self._canvas.ax
+        self._draglines = []
         self._navbar = self._app.builder.get_object("plot_toolbar")
         # Connect to changes of the states
         signals = (
@@ -115,7 +117,7 @@ class PlotManager():
             "changed-peak"
         )
         for signal in signals:
-            self._app.bus.subscribe(self.update, signal)
+            self._app.bus.subscribe(self.update, signal, priority=10)
 
     def update(self, event, keepaxes=True):
         """Updates plot by redrawing the whole thing. Relies on
@@ -164,8 +166,12 @@ class PlotManager():
                 "linestyle": "--",
                 "alpha": 1
             }
+            self._draglines.clear()
             for bound in spectrum.background_bounds:
-                self._ax.axvline(bound, 0, 1, **line)
+                linewidget = self._ax.axvline(bound, 0, 1, **line)
+                dragline = DraggableVLine(linewidget, spectrum)
+                dragline.register_queue(self._app.bus)
+                self._draglines.append(dragline)
             line = {
                 "color": COLORS["Plotting"]["region-background"],
                 "linewidth": 1,
@@ -184,8 +190,9 @@ class PlotManager():
     def _plot_peaks(self):
         inactive_color = COLORS["Plotting"]["peak"]
         active_color = COLORS["Plotting"]["peak-active"]
+        sum_color = COLORS["Plotting"]["peak-sum"]
         for spectrum in self._gui.active_spectra:
-            for peak in spectrum.model.peaks:
+            for peak in spectrum.peaks:
                 line = {}
                 if peak in self._gui.active_peaks:
                     line = {
@@ -211,6 +218,16 @@ class PlotManager():
                     spectrum.background + peak.intensity,
                     **line
                 )
+            line = {
+                "color": sum_color,
+                "linewidth": 1,
+                "linestyle": "--",
+            }
+            self._ax.plot(
+                spectrum.energy,
+                spectrum.background + spectrum.fit,
+                **line
+            )
 
     def _plot_rsf(self):
         element_colors = cycle(COLORS["Plotting"]["rsf-vlines"].split(","))
@@ -263,11 +280,10 @@ class SpectrumPanelManager():
 
         self._make_columns()
         self._setup_filter()
-        self.update_controls(Event("dummy"))
 
         signals = (
             "changed-spectrum",
-            "changed-metadata",
+            "changed-spectrum-meta",
             "changed-spectra",
             "changed-active"
         )
@@ -301,7 +317,7 @@ class SpectrumPanelManager():
         treestore.clear()
         for spectrum in self._spectra.spectra:
             row = [
-                str(spectrum.meta.get(attr))
+                str(spectrum.get_meta(attr))
                 for attr in list(self._gui.titles["spectrum_view"].keys())
             ]
             treestore.append(parent=None, row=[spectrum] + row)
@@ -339,7 +355,9 @@ class SpectrumPanelManager():
                 norm_entry.set_sensitive(False)
             else:
                 normid = self._gui.titles["norm_type_ids"][norm_types[0]]
-                norm_combo.set_active_id(normid)
+                norm_combo.set_active(int(normid))
+                # this circumvents signal emission instead
+                # of this: norm.set_active_id(normid)
                 norm_caution.set_visible(False)
                 if norm_types[0] == "manual":
                     norm_entry.set_sensitive(True)
@@ -433,36 +451,17 @@ class PeakPanelManager():
         self._gui = gui
         self._spectra = spectra
 
-        # tvmenu = self._app.builder.get_object("spectrum_view_context_menu")
-        # treeview = self._app.builder.get_object("peak_view")
-        # tvmenu.attach_to_widget(treeview, None)
-
         self._make_columns()
 
         signals = (
-            "changed-spectra",
-            "changed-spectrum",
             "changed-peak",
+            "changed-peak-meta",
             "changed-fit",
             "changed-active"
         )
         for signal in signals:
             self._app.bus.subscribe(self.update_data, signal)
             self._app.bus.subscribe(self.update_controls, signal)
-
-        # self._spectra.connect("changed-spectra", self.update_data)
-        # self._spectra.connect("changed-spectrum", self.update_data)
-        # self._spectra.connect("changed-peak", self.update_data)
-        # self._spectra.connect("changed-fit", self.update_data)
-        # self._gui.connect("changed-active", self.update_data)
-        # self._spectra.connect("changed-spectra", self.update_controls)
-        # self._spectra.connect("changed-spectrum", self.update_controls)
-        # self._spectra.connect("changed-peak", self.update_controls)
-        # self._spectra.connect("changed-fit", self.update_controls)
-        # self._gui.connect("changed-active", self.update_controls)
-
-        self.update_data(None)
-        self.update_controls(None)
 
     def update_data(self, _event):
         """Updates TreeModel with data from the SpectrumContainer.
@@ -473,7 +472,7 @@ class PeakPanelManager():
         treestore = self._app.builder.get_object("peak_treestore")
         treestore.clear()
         for spectrum in self._gui.active_spectra:
-            for peak in spectrum.model.peaks:
+            for peak in spectrum.peaks:
                 row = [
                     self.format_peak_attr(peak, attr)
                     for attr in list(self._gui.titles["peak_view"].keys())
@@ -482,9 +481,15 @@ class PeakPanelManager():
         # reset selected spectra
         self._set_selection(active_peaks)
 
-    def update_controls(self, _event):
+    def update_controls(self, event):
         """Updates the entries representing peak parameters."""
         active_peaks = self._gui.active_peaks
+        if event.signal in ("changed-peak", "changed-peak-meta"):
+            if not set(event.source) & set(active_peaks):
+                return
+        if event.signal == "changed-fit":
+            if not set(event.source) & set(self._gui.active_spectra):
+                return
         label_entry = self._app.builder.get_object("peak_name_entry")
         position_entry = self._app.builder.get_object("peak_position_entry")
         area_entry = self._app.builder.get_object("peak_area_entry")
@@ -513,11 +518,11 @@ class PeakPanelManager():
 
         label_entry.set_text(peak.label)
         label_entry.set_sensitive(True)
-        position_entry.set_text(str(peak.position))
+        position_entry.set_text(self.format_peak_constraints(peak, "position"))
         position_entry.set_sensitive(True)
-        area_entry.set_text(str(peak.area))
+        area_entry.set_text(self.format_peak_constraints(peak, "area"))
         area_entry.set_sensitive(True)
-        fwhm_entry.set_text(str(peak.fwhm))
+        fwhm_entry.set_text(self.format_peak_constraints(peak, "fwhm"))
         fwhm_entry.set_sensitive(True)
 
         model_combo.remove_all()
@@ -527,23 +532,53 @@ class PeakPanelManager():
                 model_combo.set_active(i)
         model_combo.set_sensitive(True)
         alpha_label.set_text(peak.alpha_name)
-        alpha_entry.set_text(str(peak.alpha))
+        alpha_entry.set_text(self.format_peak_constraints(peak, "alpha"))
         alpha_entry.set_sensitive(True)
 
     def format_peak_attr(self, peak, attr):
         """Returns a string representing the peak's distinct attribute."""
-        value = peak.get(attr)
-        if attr in ["position", "fwhm", "area", "alpha", "beta"]:
-            if value is None:
+        if attr in ("position", "fwhm", "area", "alpha", "beta"):
+            constraints = peak.get_constraints(attr)
+            if constraints is None:
                 return ""
-            return "{:.2f}".format(value)
+            cstring = ""
+            if constraints["expr"]:
+                cstring += " = {}".format(constraints["expr"])
+            elif not constraints["vary"]:
+                cstring += " fixed"
+            else:
+                if constraints["min"] not in (float("-inf"), 0):
+                    cstring += " &gt; {} ".format(constraints["min"])
+                if constraints["max"] != (float("inf")):
+                    cstring += " &lt; {}".format(constraints["max"])
+            formatted = (
+                "{:.2f}<span color='#999999' font_size='xx-small'> {}</span>"
+                "".format(constraints["value"], cstring))
         if attr == "name":
             if len(self._gui.active_spectra) >= 2:
-                value = "{p_name} ({s_name})".format(
-                    p_name=value,
-                    s_name=peak.s_model.spectrum.meta.name
-                )
-        return str(value)
+                formatted = "{} ({})".format(peak.name, peak.spectrum.name)
+            else:
+                formatted = str(peak.name)
+        if attr in ("label", "shape"):
+            formatted = getattr(peak, attr)
+        return formatted
+
+    @staticmethod
+    def format_peak_constraints(peak, attr):
+        """Returns a string representing the peak's attribute's constraints.
+        """
+        constraints = peak.get_constraints(attr)
+        cstring = ""
+        if constraints["expr"]:
+            cstring += str(constraints["expr"])
+        elif not constraints["vary"]:
+            cstring += "{}".format(constraints["value"])
+        else:
+            if constraints["min"] not in (float("-inf"), 0):
+                cstring += "> {} ".format(constraints["min"])
+            if constraints["max"] != (float("inf")):
+                cstring += "< {}".format(constraints["max"])
+        return cstring
 
     def _set_selection(self, peaks):
         """Selects rows representing spectra."""
@@ -559,9 +594,10 @@ class PeakPanelManager():
         treeview = self._app.builder.get_object("peak_view")
         highlight_bg = COLORS["Treeview"]["tv-highlight-bg"]
         lowlight_bg = treeview.style_get_property("even-row-color")
-        def render_isactive(_col, renderer, model, iter_, *_data):
+        def render_constraints(_col, renderer, model, iter_, idx):
             """Renders the cell light blue if this peak is active."""
             peak = model.get_value(iter_, 0)
+            value = model.get_value(iter_, idx + 1)
             if peak in self._gui.active_peaks:
             # if model.get_value(iter_, 1):
                 renderer.set_property("cell-background", highlight_bg)
@@ -569,6 +605,7 @@ class PeakPanelManager():
             else:
                 renderer.set_property("cell-background", lowlight_bg)
                 renderer.set_property("weight", Pango.Weight.NORMAL)
+            renderer.set_property("markup", value)
         # the other columns are simple, just apply the render_isplotted func
         for attr in self._gui.peak_tv_columns:
             renderer = Gtk.CellRendererText(xalign=0)
@@ -576,7 +613,7 @@ class PeakPanelManager():
             # skip first column, it is "peak"
             idx = list(self._gui.titles["peak_view"].keys()).index(attr)
             column = Gtk.TreeViewColumn(title, renderer, text=idx + 1)
-            column.set_cell_data_func(renderer, render_isactive)
+            column.set_cell_data_func(renderer, render_constraints, idx)
             column.set_sort_column_id(idx + 1)
             column.set_resizable(True)
             column.set_reorderable(True)
@@ -604,8 +641,8 @@ class EditDialogManager():
             if not spectra:
                 return ""
             if len(spectra) == 1:
-                return str(spectra[0].meta.get(attr))
-            values = [str(spectrum.meta.get(attr)) for spectrum in spectra]
+                return str(spectra[0].get_meta(attr))
+            values = [str(spectrum.get_meta(attr)) for spectrum in spectra]
             valueset = set(values)
             if len(valueset) > 1:
                 valuestring = separator.join(valueset) + self._exclusion_key

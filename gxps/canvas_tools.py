@@ -8,6 +8,8 @@ from matplotlib.widgets import AxesWidget, _SelectorWidget
 from matplotlib.patches import Rectangle, Wedge
 from matplotlib.transforms import blended_transform_factory
 
+from gxps.utility import Observable
+
 
 class PointSelector(_SelectorWidget):
     """Select a point on the canvas."""
@@ -398,13 +400,15 @@ class SpanSelector(_SelectorWidget):
         return False
 
 
-class DraggableVLine(AxesWidget):
+class DraggableVLine(Observable, AxesWidget):
     """A draggable vertical line in the plot."""
-    def __init__(self, line):
+    _signals = ("changed-vline", )
+    def __init__(self, line, spectrum):
         self.line = line
         super().__init__(line.axes)
         self.press = None
         self.background = None
+        self.spectrum = spectrum
 
         self.connect()
 
@@ -440,20 +444,35 @@ class DraggableVLine(AxesWidget):
         self.line.axes.draw_artist(self.line)
         self.canvas.blit(self.line.axes.bbox)
         self.canvas.widgetlock(self)
+        self.emit(
+            "changed-vline",
+            attr="press",
+            value=self.line.get_xdata(),
+            data=self.spectrum,
+            noqueue=True
+        )
 
     def on_release(self, _event):
         """When the mouse button is released."""
         if self.press is None:
-            return False
+            return
         if not self.canvas.widgetlock.available(self):
-            return False
+            return
 
+        old_value = self.press[0]
         self.press = None
 
         self.line.set_animated(False)
         self.background = None
         self.canvas.widgetlock.release(self)
-        return True
+        self.emit(
+            "changed-vline",
+            attr="release",
+            old_value=old_value,
+            value=self.line.get_xdata(),
+            data=self.spectrum,
+            noqueue=True
+        )
 
     def on_motion(self, event):
         """When the mouse is moved in pressed state."""

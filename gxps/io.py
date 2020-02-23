@@ -40,9 +40,7 @@ def save_project(fname, spectrum_container, gui_state):
         active_spectrum_idxs.append(s_idx)
     for spectrum in spectra:
         spectrum.unregister_all_queues()
-        spectrum.meta.unregister_all_queues()
-        spectrum.model.unregister_all_queues()
-        for peak in spectrum.model.peaks:
+        for peak in spectrum.peaks:
             peak.unregister_all_queues()
     state = [
         spectra,

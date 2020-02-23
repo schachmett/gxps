@@ -11,7 +11,6 @@ except ImportError:
     print("-" * 79)
     raise
 
-from gxps import CONFIG
 from gxps.gxps import GXPS
 
 

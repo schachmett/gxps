@@ -11,8 +11,9 @@ from gi.repository import Gtk, Gio, GLib
 from gxps import __appname__, __version__, ASSETDIR, CONFIG, COLORS
 from gxps.utility import EventBus
 from gxps.spectrum import SpectrumContainer
-from gxps.state import GUIState
-from gxps.controller import Controller
+from gxps.state import State
+from gxps.controller import Controller2 as Controller
+from gxps.control import CommandSender
 from gxps.view import ViewManager
 
 import gxps.widgets         # pylint: disable=unused-import
@@ -24,6 +25,7 @@ LOG = logging.getLogger(__name__)
 class GXPS(Gtk.Application):
     """Application class organising user interaction."""
     # pylint: disable=arguments-differ
+    # pylint: disable=too-many-instance-attributes
     def __init__(self):
         app_id = "com.github.schachmett.{}".format(__appname__.lower())
         super().__init__(
@@ -36,13 +38,15 @@ class GXPS(Gtk.Application):
         self.builder = Gtk.Builder.new()
         self.builder.add_from_file(str(ASSETDIR / "gtk/gxps.glade"))
         self.builder.add_from_file(str(ASSETDIR / "gtk/menus.ui"))
+        self.get_widget = self.builder.get_object
 
-        self.bus = None
         self.win = None
-        self.spectra = None
-        self.gui = None
+        self.bus = None
+        self.commandsender = None
+        self.data = None
+        self.state = None
         self.controller = None
-        self.view_manager = None
+        self._view = None
 
         self.add_main_option_entries([
             make_option("--verbosity", "-v", arg=GLib.OptionArg.INT,
@@ -63,8 +67,6 @@ class GXPS(Gtk.Application):
             except FileNotFoundError:
                 LOG.warning("File '{}' not found".format(fname))
                 self.controller.project.new()
-            else:
-                LOG.info("loaded file {}".format(fname))
         else:
             self.controller.project.new()
 
@@ -73,17 +75,26 @@ class GXPS(Gtk.Application):
         LOG.info("Starting application...")
         Gtk.Application.do_startup(self)
         self.set_menubar(self.builder.get_object("menubar"))
-        self.win = self.builder.get_object("main_window")
+        self.win = self.get_widget("main_window")
         self.win.startup(app=self)
 
         # initialize all the state objects and workers
         self.bus = EventBus(default_policy="fire")
-        self.spectra = SpectrumContainer()
-        self.spectra.register_queue(self.bus)
-        self.gui = GUIState(self, self.spectra)
-        self.gui.register_queue(self.bus)
-        self.controller = Controller(self, self.gui, self.spectra)
-        self.view_manager = ViewManager(self, self.gui, self.spectra)
+        self.data = SpectrumContainer()
+        self.data.register_queue(self.bus)
+        self.state = State(self, self.data)
+        self.state.register_queue(self.bus)
+        self.controller = Controller(self, self.state, self.data)
+        self._view = ViewManager(self, self.state, self.data)
+        self.bus.subscribe(
+            self.controller.fit.on_change_region, "changed-vline", priority=5
+        )
+        self.commandsender = CommandSender(
+            self.bus,
+            self.data,
+            self.state,
+            self.get_widget
+        )
 
         handlers = {
             "on_main_window_delete_event": self.on_quit,
@@ -112,6 +123,15 @@ class GXPS(Gtk.Application):
         }
         self.builder.connect_signals(handlers)
 
+        # TODO delete spectrum chooser?
+        # TODO background changer combo
+        # TODO bus subscription and general reordering
+        # TODO fine tune bus priority and event checking
+
+        # simple = Gio.SimpleAction.new("import-spectra", None)
+        # simple.connect("activate", self.commandsender, "import-spectra")
+        # self.add_action(simple)
+
         actions = {
             "project-new": self.controller.project.on_new,
             "save-project": self.controller.project.on_save,
@@ -129,7 +149,7 @@ class GXPS(Gtk.Application):
             "remove-peak": self.controller.fit.on_remove_peak,
             "clear-peaks": self.controller.fit.on_clear_peaks,
             "avg-selected-spectra": lambda *x: None,
-            "fit": lambda *x: None,
+            "fit": self.controller.fit.on_fit,
             "export-txt": lambda *x: None,
             "export-image": lambda *x: None,
             "quit": self.on_quit
@@ -139,15 +159,15 @@ class GXPS(Gtk.Application):
             simple.connect("activate", callback)
             self.add_action(simple)
         win_actions = {
-            "about": lambda *x: None,
+            "about": self.controller.winc.on_about,
             "center-plot": self.controller.view.on_center_plot,
             "pan-plot": self.controller.view.on_pan_plot,
             "zoom-plot": self.controller.view.on_zoom_plot,
             "show-selected-spectra":
                 self.controller.view.on_show_selected_spectra,
             "show-atomlib": self.controller.view.on_show_rsfs,
-            "view-logfile": lambda *x: None,
-            "edit-colors": lambda *x: None
+            "view-logfile": self.controller.winc.on_view_logfile,
+            "edit-colors": self.controller.winc.on_edit_colors
         }
         for name, callback in win_actions.items():
             simple = Gio.SimpleAction.new(name, None)
@@ -178,9 +198,9 @@ class GXPS(Gtk.Application):
 
     def on_quit(self, *_args):
         """Clean up, write configs, ask if user wants to save, and die."""
-        if self.gui.project_isaltered:
+        if self.state.project_isaltered:
             self.controller.project.ask_for_save()
-        if self.gui.project_isaltered:
+        if self.state.project_isaltered:
             return True
         xsize, ysize = self.win.get_size()
         xpos, ypos = self.win.get_position()

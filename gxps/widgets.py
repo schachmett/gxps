@@ -12,8 +12,11 @@ from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg
 from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3
 from matplotlib.figure import Figure
 
-from gxps import COLORS, CONFIG, __appname__
-from gxps.state import GUIState
+from gxps import (
+    COLORS, CONFIG,
+    __appname__, __version__, __authors__, __website__
+    )
+from gxps.state import State
 from gxps.canvas_tools import PeakSelector, SpanSelector, PointSelector
 
 
@@ -241,12 +244,97 @@ class GXPSSaveConfirmationDialog(Gtk.Dialog):
             )
 
 
+class GXPSAboutDialog(Gtk.AboutDialog):
+    """Pre-filled about dialog. Uses info from __init__.py variables.
+    """
+    __gtype_name__ = "GXPSAboutDialog"
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.set_program_name(__appname__)
+        self.set_version("Version: {}".format(__version__))
+        self.set_authors(__authors__)
+        self.set_website(__website__)
+        self.set_license_type(Gtk.License.GPL_3_0)
+        commentstring = (
+            "If you encounter any bugs, mail me or open an "
+            "issue on github. Please include a logfile "
+            "(access via Help -> View logfile)."
+        )
+        self.set_comments(commentstring)
+
+
+class FileFilter(Gtk.FileFilter):
+    """Very simple FileFilter for FileChooserDialogs."""
+    def __init__(self, name, patterns):
+        super().__init__()
+        for pattern in patterns:
+            self.add_pattern(pattern)
+        self.set_name(name)
+
+
+class GXPSImportDialog(Gtk.FileChooserDialog):
+    """File chooser dialog for spectrum importing."""
+    __gtype_name__ = "GXPSImportDialog"
+    def __init__(self, *_args, **_kwargs):
+        super().__init__(
+            "Import data...",
+            None,
+            Gtk.FileChooserAction.OPEN,
+            ("_Cancel", Gtk.ResponseType.CANCEL, "_Open", Gtk.ResponseType.OK),
+        )
+        self.set_select_multiple(True)
+        self.add_filter(FileFilter("all files", ["*.xym", "*txt", "*.xy"]))
+        self.add_filter(FileFilter(".xym", ["*.xym"]))
+        self.add_filter(FileFilter(".xy", ["*.xy"]))
+        self.add_filter(FileFilter(".txt", ["*.txt"]))
+
+
+class GXPSOpenProjectDialog(Gtk.FileChooserDialog):
+    """File chooser dialog for spectrum importing."""
+    __gtype_name__ = "GXPSOpenProjectDialog"
+    def __init__(self, *_args, **_kwargs):
+        super().__init__(
+            "Open project...",
+            None,
+            Gtk.FileChooserAction.OPEN,
+            ("_Cancel", Gtk.ResponseType.CANCEL, "_Open", Gtk.ResponseType.OK),
+        )
+        self.add_filter(FileFilter(".gxps", ["*.gxps"]))
+
+
+class GXPSMergeProjectDialog(Gtk.FileChooserDialog):
+    """File chooser dialog for spectrum importing."""
+    __gtype_name__ = "GXPSMergeProjectDialog"
+    def __init__(self, *_args, **_kwargs):
+        super().__init__(
+            "Merge project...",
+            None,
+            Gtk.FileChooserAction.OPEN,
+            ("_Cancel", Gtk.ResponseType.CANCEL, "_Open", Gtk.ResponseType.OK),
+        )
+        self.add_filter(FileFilter(".gxps", ["*.gxps"]))
+
+
+class GXPSSaveProjectDialog(Gtk.FileChooserDialog):
+    """File chooser dialog for spectrum importing."""
+    __gtype_name__ = "GXPSSaveProjectDialog"
+    def __init__(self, *_args, **_kwargs):
+        super().__init__(
+            "Save project...",
+            None,
+            Gtk.FileChooserAction.SAVE,
+            ("_Cancel", Gtk.ResponseType.CANCEL, "_Save", Gtk.ResponseType.OK),
+        )
+        self.add_filter(FileFilter(".gxps", ["*.gxps"]))
+        self.set_do_overwrite_confirmation(True)
+
+
 class GXPSPeakTreeStore(Gtk.TreeStore):
     """Treestore with peak information.
     """
     __gtype_name__ = "GXPSPeakTreeStore"
     def __init__(self, *_args, **_kwargs):
-        titles = GUIState.titles["peak_view"]
+        titles = State.titles["peak_view"]
         # the first column is "is_actve"
         types = [object] + [str] * len(titles)
         super().__init__(*types)
@@ -257,7 +345,7 @@ class GXPSSpectrumTreeStore(Gtk.TreeStore):
     """
     __gtype_name__ = "GXPSSpectrumTreeStore"
     def __init__(self, *_args, **_kwargs):
-        titles = GUIState.titles["spectrum_view"]
+        titles = State.titles["spectrum_view"]
         # the first column is "is_actve"
         types = [object] + [str] * len(titles)
         super().__init__(*types)

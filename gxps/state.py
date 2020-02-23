@@ -17,7 +17,7 @@ from gxps.utility import Observable #, EventQueue
 LOG = logging.getLogger(__name__)
 
 
-class GUIState(Observable):
+class State(Observable):
     """Holds information on the GUI state.
     """
     # pylint: disable=too-many-instance-attributes
@@ -40,7 +40,7 @@ class GUIState(Observable):
         }),
         "peak_view": OrderedBidict({
             "label": "Label",
-            "name": "Name",
+            "name": "     ",
             "shape": "Shape",
             "position": "Position",
             "area": "Area",
@@ -108,7 +108,20 @@ class GUIState(Observable):
             "show-rsfs": True
         }
         # Keep the active spectra up to date
-        self._app.bus.subscribe(self.update_active, "changed-spectra")
+        self._app.bus.subscribe(
+            self.update_active, "changed-spectra", priority=0)
+        self._app.bus.subscribe(
+            self.update_active, "changed-fit", priority=0)
+        signals = (
+            "changed-spectra",
+            "changed-spectrum",
+            "changed-spectrum-meta",
+            "changed-fit",
+            "changed-peak",
+            "changed-peak-meta"
+        )
+        for signal in signals:
+            self._app.bus.subscribe(self.alter_project, signal, priority=10)
 
         super().__init__()
 
@@ -134,7 +147,7 @@ class GUIState(Observable):
         peaks = self._active_peaks.copy()
         for peak in self._active_peaks:
             for spectrum in self._active_spectra:
-                if peak in spectrum.model.peaks:
+                if peak in spectrum.peaks:
                     break
             else:
                 peaks.remove(peak)
@@ -172,13 +185,19 @@ class GUIState(Observable):
         """
         v_peaks = []
         for spectrum in self.active_spectra:
-            v_peaks.extend(spectrum.model.peaks)
+            v_peaks.extend(spectrum.peaks)
         return v_peaks
 
     @property
     def active_peaks(self):
         """Currently active peaks.
         """
+        # for peak in self._active_peaks:
+        #     for spectrum in self.active_spectra:
+        #         if peak in spectrum.peaks:
+        #             break
+        #     else:
+        #         self._active_peaks.remove(peak)
         return self._active_peaks.copy()
 
     @active_peaks.setter
@@ -189,7 +208,7 @@ class GUIState(Observable):
             return
         for peak in peaks.copy():
             for spectrum in self.active_spectra:
-                if peak in spectrum.model.peaks:
+                if peak in spectrum.peaks:
                     break
             else:
                 raise ValueError("Invalid peak activated.")
@@ -197,9 +216,19 @@ class GUIState(Observable):
         self._active_peaks.extend(peaks)
         self.emit("changed-active", attr="peaks")
 
+    @property
+    def selected_peaks(self):
+        """Currently selected peaks. Will be set to active peaks
+        immediately by the ViewController.
+        """
+        selection = self._app.builder.get_object("peak_selection")
+        model, pathlist = selection.get_selected_rows()
+        iters = [model.get_iter(path) for path in pathlist]
+        peaks = [model.get(iter_, 0)[0] for iter_ in iters]
+        return peaks
+
     def update_active(self, *_args):
         """Clean out active spectra/peaks that do not exist anymore."""
-        # with EventQueue("combine-all"):
         spectra = self._active_spectra.copy()
         for spectrum in self._active_spectra:
             if spectrum not in self._spectra.spectra:
@@ -208,7 +237,7 @@ class GUIState(Observable):
         peaks = self._active_peaks.copy()
         for peak in self._active_peaks:
             for spectrum in self._active_spectra:
-                if peak in spectrum.model.peaks:
+                if peak in spectrum.peaks:
                     break
             else:
                 peaks.remove(peak)
@@ -217,6 +246,8 @@ class GUIState(Observable):
     @property
     def current_project(self):
         """Filename of the currently opened project."""
+        if self._current_project == "Untitled":
+            return ""
         return self._current_project
 
     @current_project.setter
@@ -247,6 +278,10 @@ class GUIState(Observable):
         if isaltered != self._project_isaltered:
             self._project_isaltered = isaltered
             self.emit("changed-project", attr="isaltered")
+
+    def alter_project(self, _event):
+        """Helper for setting project_isaltered."""
+        self.project_isaltered = True
 
     @property
     def spectra_tv_columns(self):

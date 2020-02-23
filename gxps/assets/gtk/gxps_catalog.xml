@@ -10,41 +10,79 @@
     <init-function>glade_python_init</init-function>
 
     <glade-widget-classes>
+    
         <glade-widget-class
             title="GXPS Application Window"
             name="GXPSAppWindow" 
             parent="GtkApplicationWindow" 
             generic-name="gxpsappwindow"/>
+            
+        <glade-widget-class
+            title="GXPS Import Dialog"
+            name="GXPSImportDialog" 
+            parent="GtkFileChooserDialog" 
+            generic-name="gxpsimportdialog"/>
+            
+        <glade-widget-class
+            title="GXPS Open Project Dialog"
+            name="GXPSOpenProjectDialog" 
+            parent="GtkFileChooserDialog" 
+            generic-name="gxpsopenprojectdialog"/>
+            
+        <glade-widget-class
+            title="GXPS Merge Project Dialog"
+            name="GXPSMergeProjectDialog" 
+            parent="GtkFileChooserDialog" 
+            generic-name="gxpsmergeprojectdialog"/>
+            
+        <glade-widget-class
+            title="GXPS Save Project Dialog"
+            name="GXPSSaveProjectDialog" 
+            parent="GtkFileChooserDialog" 
+            generic-name="gxpssaveprojectdialog"/>
+            
         <glade-widget-class
             title="GXPS Save Confirmation Dialog"
             name="GXPSSaveConfirmationDialog" 
             parent="GtkDialog" 
             generic-name="gxpssaveconfirmationdialog"/>
+            
+        <glade-widget-class
+            title="GXPS About Dialog"
+            name="GXPSAboutDialog" 
+            parent="GtkAboutDialog" 
+            generic-name="gxpsaboutdialog"/>
+            
         <glade-widget-class
             title="GXPS Edit Spectrum Dialog"
             name="GXPSEditSpectrumDialog"
             parent="GtkDialog"
             generic-name="gxpseditspectrumdialog"/>
+            
         <glade-widget-class
             title="GXPS Spectrum TreeStore" 
             name="GXPSSpectrumTreeStore" 
             parent="GtkTreeStore" 
             generic-name="gxpsspectrumtreestore"/>
+            
         <glade-widget-class 
             title="GXPS Peak TreeStore"
             name="GXPSPeakTreeStore"
             parent="GtkTreeStore"
             generic-name="gxpspeaktreestore"/>
+            
         <glade-widget-class
             title="GXPS Canvas"
             name="GXPSCanvas"
             parent="GtkDrawingArea"
             generic-name="gxpscanvas"/>
+            
         <glade-widget-class
             title="MPL Canvas"
             name="MPLCanvas"
             parent="GtkDrawingArea"
             generic-name="mplcanvas"/>
+            
         <glade-widget-class
             title="GXPS Plot Toolbar"
             name="GXPSPlotToolbar"
