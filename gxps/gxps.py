@@ -12,7 +12,6 @@ from gxps import __appname__, __version__, ASSETDIR, CONFIG, COLORS
 from gxps.utility import EventBus
 from gxps.spectrum import SpectrumContainer
 from gxps.state import State
-from gxps.controller import Controller2 as Controller
 from gxps.control import CommandSender
 from gxps.view import ViewManager
 
@@ -20,6 +19,13 @@ import gxps.widgets         # pylint: disable=unused-import
 
 
 LOG = logging.getLogger(__name__)
+
+
+# TODO delete spectrum chooser?
+# TODO background changer combo
+# TODO bus subscription and general reordering
+# TODO fine tune bus priority and event checking
+
 
 
 class GXPS(Gtk.Application):
@@ -45,7 +51,6 @@ class GXPS(Gtk.Application):
         self.commandsender = None
         self.data = None
         self.state = None
-        self.controller = None
         self._view = None
 
         self.add_main_option_entries([
@@ -60,15 +65,7 @@ class GXPS(Gtk.Application):
         LOG.debug("Activating application...")
         # load the last used project file
         fname = CONFIG["IO"]["current-project"]
-        # with EventQueue("combine-all"):
-        if fname:
-            try:
-                self.controller.project.open(fname)
-            except FileNotFoundError:
-                LOG.warning("File '{}' not found".format(fname))
-                self.controller.project.new()
-        else:
-            self.controller.project.new()
+        self.commandsender(fname, "startup")
 
     def do_startup(self):
         """Adds actions."""
@@ -84,11 +81,7 @@ class GXPS(Gtk.Application):
         self.data.register_queue(self.bus)
         self.state = State(self, self.data)
         self.state.register_queue(self.bus)
-        self.controller = Controller(self, self.state, self.data)
         self._view = ViewManager(self, self.state, self.data)
-        self.bus.subscribe(
-            self.controller.fit.on_change_region, "changed-vline", priority=5
-        )
         self.commandsender = CommandSender(
             self.bus,
             self.data,
@@ -96,83 +89,44 @@ class GXPS(Gtk.Application):
             self.get_widget
         )
 
-        handlers = {
-            "on_main_window_delete_event": self.on_quit,
-            "on_calibration_spinbutton_value_changed":
-                self.controller.data.on_calibrate,
-            "on_normalization_combo_changed":
-                self.controller.data.on_normalize,
-            "on_normalization_entry_activate":
-                self.controller.data.on_normalize_manual,
-            "on_region_background_type_combo_changed": lambda *x: None,
-            "on_peak_entry_activate":
-                self.controller.fit.on_peak_entry_activate,
-            "on_peak_name_entry_changed":
-                self.controller.fit.on_peak_name_entry_changed,
-            "on_spectrum_view_search_entry_changed":
-                self.controller.view.on_spectrum_view_filter_changed,
-            "on_spectrum_view_search_combo_changed":
-                self.controller.view.on_spectrum_view_filter_changed,
-            "on_spectrum_view_button_press_event":
-                self.controller.view.on_spectrum_view_clicked,
-            "on_spectrum_view_row_activated":
-                self.controller.view.on_spectrum_view_row_activated,
-            "on_peak_view_row_activated":
-                self.controller.view.on_peak_view_row_activated,
-            "on_spectrum_chooser_combo_changed": lambda *x: None
-        }
+        callbacks = [
+            "on_calibration_spinbutton_value_changed",
+            "on_normalization_combo_changed",
+            "on_normalization_entry_activate",
+            "on_region_background_type_combo_changed",
+            "on_peak_entry_activate",
+            "on_peak_name_entry_changed",
+            "on_spectrum_view_search_entry_changed",
+            "on_spectrum_view_search_combo_changed",
+            "on_spectrum_view_button_press_event",
+            "on_spectrum_view_row_activated",
+            "on_peak_view_row_activated",
+            "on_spectrum_chooser_combo_changed",
+        ]
+        actions = [
+            "project-new", "save-project", "save-project-as", "open-project",
+            "merge-project", "import-spectra", "export-txt", "export-image",
+
+            "edit-spectra", "remove-spectra", "avg-selected-spectra",
+
+            "add-region", "remoge-region", "clear-regions", "add-peak",
+            "add-guessed-peak", "remove-peak", "clear-peaks", "fit",
+
+            "show-selected-spectra", "show-atomlib", "center-plot", "pan-plot",
+            "zoom-plot",
+
+            "view-logfile", "edit-colors", "about"
+        ]
+        handlers = dict((key, (self.commandsender, key)) for key in callbacks)
+        handlers["on_main_window_delete_event"] = self.on_quit
         self.builder.connect_signals(handlers)
-
-        # TODO delete spectrum chooser?
-        # TODO background changer combo
-        # TODO bus subscription and general reordering
-        # TODO fine tune bus priority and event checking
-
-        # simple = Gio.SimpleAction.new("import-spectra", None)
-        # simple.connect("activate", self.commandsender, "import-spectra")
-        # self.add_action(simple)
-
-        actions = {
-            "project-new": self.controller.project.on_new,
-            "save-project": self.controller.project.on_save,
-            "save-project-as": self.controller.project.on_save_as,
-            "open-project": self.controller.project.on_open,
-            "merge-project": self.controller.project.on_merge,
-            "import-spectra": self.controller.data.on_import,
-            "remove-spectra": self.controller.data.on_remove_selected_spectra,
-            "edit-spectra": self.controller.data.on_edit_spectra,
-            "remove-region": self.controller.fit.on_remove_region,
-            "clear-regions": lambda *x: None,
-            "add-region": self.controller.fit.on_add_region,
-            "add-peak": self.controller.fit.on_add_peak,
-            "add-guessed-peak": lambda *x: None,
-            "remove-peak": self.controller.fit.on_remove_peak,
-            "clear-peaks": self.controller.fit.on_clear_peaks,
-            "avg-selected-spectra": lambda *x: None,
-            "fit": self.controller.fit.on_fit,
-            "export-txt": lambda *x: None,
-            "export-image": lambda *x: None,
-            "quit": self.on_quit
-        }
-        for name, callback in actions.items():
+        for name in actions:
             simple = Gio.SimpleAction.new(name, None)
-            simple.connect("activate", callback)
+            simple.connect("activate", self.commandsender, name)
             self.add_action(simple)
-        win_actions = {
-            "about": self.controller.winc.on_about,
-            "center-plot": self.controller.view.on_center_plot,
-            "pan-plot": self.controller.view.on_pan_plot,
-            "zoom-plot": self.controller.view.on_zoom_plot,
-            "show-selected-spectra":
-                self.controller.view.on_show_selected_spectra,
-            "show-atomlib": self.controller.view.on_show_rsfs,
-            "view-logfile": self.controller.winc.on_view_logfile,
-            "edit-colors": self.controller.winc.on_edit_colors
-        }
-        for name, callback in win_actions.items():
-            simple = Gio.SimpleAction.new(name, None)
-            simple.connect("activate", callback)
-            self.win.add_action(simple)
+        simple = Gio.SimpleAction.new("quit", None)
+        simple.connect("activate", self.on_quit)
+        self.add_action(simple)
 
     def do_command_line(self, command_line):
         """Handles command line arguments"""
@@ -199,7 +153,7 @@ class GXPS(Gtk.Application):
     def on_quit(self, *_args):
         """Clean up, write configs, ask if user wants to save, and die."""
         if self.state.project_isaltered:
-            self.controller.project.ask_for_save()
+            self.commandsender("ask-for-save")
         if self.state.project_isaltered:
             return True
         xsize, ysize = self.win.get_size()

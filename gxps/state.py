@@ -86,7 +86,6 @@ class State(Observable):
         self._active_spectra = []
         self._editing_spectra = []
         self._active_peaks = []
-        self.peak_names = []
         # Project file-related
         self._current_project = ""
         self._project_isaltered = False
@@ -215,6 +214,24 @@ class State(Observable):
         self._active_peaks.clear()
         self._active_peaks.extend(peaks)
         self.emit("changed-active", attr="peaks")
+
+    @property
+    def peak_names(self):
+        """Already taken peak names."""
+        peak_names = []
+        for spectrum in self._spectra.spectra:
+            for peak in spectrum.peaks:
+                peak_names.append(peak.name)
+        return peak_names
+
+    @property
+    def next_peak_name(self):
+        """Returns the next peak name that is free."""
+        peak_names = self.peak_names
+        for name in self.peak_name_list:
+            if name not in peak_names:
+                return name
+        return "N/A"
 
     @property
     def selected_peaks(self):

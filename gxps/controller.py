@@ -23,16 +23,6 @@ import gxps.io
 LOG = logging.getLogger(__name__)
 
 
-class Controller2():
-    "bla"
-    def __init__(self, app, gui, spectra):
-        self.project = ProjectController(app.get_widget, gui, spectra)
-        self.data = DataController(app.get_widget, gui, spectra)
-        self.view = ViewController(app.get_widget, gui, spectra)
-        self.fit = FitController(app.get_widget, gui, spectra)
-        self.winc = WinController(app.get_widget)
-
-
 class Operator:
     """Meta class for objects that contain the main functions of the
     application as methods.
@@ -43,11 +33,8 @@ class Operator:
         self.data = data
 
 
-class WinController():
+class Help(Operator):
     """Cares about extra windows etc."""
-    def __init__(self, get_widget):
-        self.get_widget = get_widget
-
     @staticmethod
     def on_view_logfile(_action, *_args):
         """Views logfile in external text editor."""
@@ -71,29 +58,18 @@ class WinController():
         dialog.hide()
 
 
-class ProjectController():
+class File(Operator):
     """Manages project files."""
-    def __init__(self, get_widget, state, data):
-        self.get_widget = get_widget
-        self.state = state
-        self.data = data
-
-    def ask_for_save(self):
-        """Opens a AskForSaveDialog and then either saves the file or,
-        if the user does not want to save, sets the project_isaltered
-        to False. If the dialog is canceled, nothing happens and
-        project_isaltered stays True.
-        """
-        dialog = self.get_widget("save_confirmation_dialog")
-        response = dialog.run()
-        if response == Gtk.ResponseType.YES:
-            dialog.hide()
-            self.on_save()
-        elif response == Gtk.ResponseType.NO:
-            dialog.hide()
-            self.state.project_isaltered = False
+    def startup(self, fname, *_args):
+        """Opens a file or makes a new project if that file does not exist."""
+        if fname:
+            try:
+                self.open(fname)
+            except FileNotFoundError:
+                LOG.warning("File '{}' not found".format(fname))
+                self.new()
         else:
-            dialog.hide()
+            self.new()
 
     def new(self):
         """Make new project."""
@@ -150,6 +126,37 @@ class ProjectController():
             self.open(fname, merge=True)
         dialog.hide()
 
+    def on_import(self, *_args):
+        """Imports spectra from a data file."""
+        dialog = self.get_widget("import_dialog")
+        data_dir = os.path.expandvars(CONFIG["IO"]["data-dir"])
+        dialog.set_current_folder(data_dir)
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            CONFIG["IO"]["data-dir"] = dialog.get_current_folder()
+            specdicts = []
+            for fname in dialog.get_filenames():
+                specdicts.extend(gxps.io.parse_spectrum_file(fname))
+            for specdict in specdicts:
+                self.data.add_spectrum(**specdict)
+        dialog.hide()
+
+    def ask_for_save(self):
+        """Opens a AskForSaveDialog and then either saves the file or,
+        if the user does not want to save, sets the project_isaltered
+        to False. If the dialog is canceled, nothing happens and
+        project_isaltered stays True."""
+        dialog = self.get_widget("save_confirmation_dialog")
+        response = dialog.run()
+        if response == Gtk.ResponseType.YES:
+            dialog.hide()
+            self.on_save()
+        elif response == Gtk.ResponseType.NO:
+            dialog.hide()
+            self.state.project_isaltered = False
+        else:
+            dialog.hide()
+
     def save(self, fname):
         """Saves project file."""
         gxps.io.save_project(fname, self.data, self.state)
@@ -177,41 +184,20 @@ class ProjectController():
         dialog.hide()
 
 
-class DataController():
-    """Contains methods for user initiated data manipulation.
-    """
-    def __init__(self, get_widget, gui, spectra):
-        self.get_widget = get_widget
-        self._gui = gui
-        self._spectra = spectra
-
-    def on_import(self, *_args):
-        """Imports spectra from a data file."""
-        dialog = self.get_widget("import_dialog")
-        data_dir = os.path.expandvars(CONFIG["IO"]["data-dir"])
-        dialog.set_current_folder(data_dir)
-        response = dialog.run()
-        if response == Gtk.ResponseType.OK:
-            CONFIG["IO"]["data-dir"] = dialog.get_current_folder()
-            specdicts = []
-            for fname in dialog.get_filenames():
-                specdicts.extend(gxps.io.parse_spectrum_file(fname))
-            for specdict in specdicts:
-                self._spectra.add_spectrum(**specdict)
-        dialog.hide()
-
+class Edit(Operator):
+    """Contains methods for user initiated data manipulation."""
     def on_remove_selected_spectra(self, *_args):
         """Removes selected spectra."""
-        spectra = self._gui.selected_spectra
+        spectra = self.state.selected_spectra
         for spectrum in spectra:
-            self._spectra.remove_spectrum(spectrum)
+            self.data.remove_spectrum(spectrum)
 
     def on_edit_spectra(self, *_args):
         """Opens an 'Edit' dialog for selected spectra."""
-        spectra = self._gui.selected_spectra
+        spectra = self.state.selected_spectra
         if not spectra:
             return
-        self._gui.editing_spectra = spectra
+        self.state.editing_spectra = spectra
         dialog = self.get_widget("edit_spectrum_dialog")
         response = dialog.run()
         if response == Gtk.ResponseType.APPLY:
@@ -220,13 +206,13 @@ class DataController():
                 for attr, value in values.items():
                     spectrum.set_meta(attr, value)
         dialog.hide()
-        self._gui.editing_spectra = []
+        self.state.editing_spectra = []
 
     def on_calibrate(self, *_args):
         """Changes the calibration for selected spectra."""
         adjustment = self.get_widget("calibration_spinbutton_adjustment")
         calibration = float(adjustment.get_value())
-        for spectrum in self._gui.active_spectra:
+        for spectrum in self.state.active_spectra:
             spectrum.energy_calibration = calibration
 
     def on_normalize(self, *_args):
@@ -235,42 +221,35 @@ class DataController():
         normid = combo.get_active_id()
         if normid is None:
             return
-        norm_type = self._gui.titles["norm_type_ids"].inverse[normid]
-        for spectrum in self._gui.active_spectra:
+        norm_type = self.state.titles["norm_type_ids"].inverse[normid]
+        for spectrum in self.state.active_spectra:
             spectrum.normalization_type = norm_type
 
     def on_normalize_manual(self, *_args):
         """Changes the normalization divisor directly."""
         entry = self.get_widget("normalization_entry")
-        for spectrum in self._gui.active_spectra:
+        for spectrum in self.state.active_spectra:
             if spectrum.normalization_type != "manual":
                 raise ValueError("Normalization is not set to manual")
             spectrum.normalization_divisor = 1 / float(entry.get_text())
 
 
-class FitController():
+class Fit(Operator):
     """Methods for drawing peaks, fitting and peak and background
-    manipulation.
-    """
-    # pylint: disable=no-self-use
-    def __init__(self, get_widget, gui, spectra):
-        self.get_widget = get_widget
-        self._gui = gui
-        self._spectra = spectra
-
+    manipulation."""
     def on_add_region(self, *_args):
         """Add two region boundaries to each of the active spectra."""
         def add_region(emin, emax):
             """Add region"""
-            # with EventQueue("combine-all"):
-            for spectrum in self._gui.active_spectra:
+            for spectrum in self.state.active_spectra:
                 spectrum.background_type = "shirley"
                 spectrum.add_background_bounds(emin, emax)
         spanprops = {"edgecolor": COLORS["Plotting"]["region-vlines"], "lw": 2}
         navbar = self.get_widget("plot_toolbar")
         navbar.get_span(add_region, **spanprops)
 
-    def on_change_region(self, event):
+    @staticmethod
+    def on_change_region(event):
         """Set a new region boundary."""
         if "release" not in event.properties["attr"]:
             return
@@ -291,8 +270,7 @@ class FitController():
         def remove_region(_x_0, _y_0, x_1, _y_1):
             """Remove region"""
             esel = x_1
-            # with EventQueue("combine-all"):
-            for spectrum in self._gui.active_spectra:
+            for spectrum in self.state.active_spectra:
                 bg_bounds = spectrum.background_bounds.copy()
                 for lower, upper in zip(bg_bounds[0::2], bg_bounds[1::2]):
                     if esel >= lower and esel <= upper:
@@ -304,65 +282,62 @@ class FitController():
         """Add peak to active regions."""
         def add_peak(position, height, angle):
             """Create new peak from drawn parameters."""
-            for spectrum in self._gui.active_spectra:
+            for spectrum in self.state.active_spectra:
                 height -= spectrum.background_of_E(position)
-                for pname in self._gui.peak_name_list:
-                    if pname not in self._gui.peak_names:
-                        name = pname
-                        break
-                self._gui.peak_names.append(name)
-                spectrum.add_peak(
-                    name,
-                    position=position,
-                    angle=angle,
-                    height=height,
-                    shape="PseudoVoigt"
-                )
+                name = self.state.next_peak_name
+                shape = "PseudoVoigt"
+                spectrum.add_peak(name, position=position, angle=angle,
+                                  height=height, shape=shape)
         wedgeprops = {}
         navbar = self.get_widget("plot_toolbar")
         navbar.get_wedge(add_peak, **wedgeprops)
 
-    def on_remove_peak(self, *_args):
+    def on_remove_active_peak(self, *_args):
         """Remove active peak."""
-        for peak in self._gui.active_peaks:
-            self._gui.peak_names.remove(peak.name)
+        for peak in self.state.active_peaks:
+            self.state.peak_names.remove(peak.name)
             peak.spectrum.remove_peak(peak)
 
     def on_clear_peaks(self, *_args):
         """Remove all peaks from active spectra."""
         # with EventQueue("combine-all"):
-        for spectrum in self._gui.selected_spectra:
+        for spectrum in self.state.selected_spectra:
             for peak in spectrum.peaks:
-                self._gui.peak_names.remove(peak.name)
+                self.state.peak_names.remove(peak.name)
                 spectrum.remove_peak(peak.name)
 
     def on_peak_entry_activate(self, *_args):
         """Change the active peak's parameters."""
-        active_peaks = self._gui.active_peaks
+        active_peaks = self.state.active_peaks
         if len(active_peaks) != 1:
             return
         peak = active_peaks[0]
-
-        position_entry = self.get_widget("peak_position_entry")
-        area_entry = self.get_widget("peak_area_entry")
-        fwhm_entry = self.get_widget("peak_fwhm_entry")
+        entries = {
+            "peak_position_entry": "position",
+            "peak_area_entry": "area",
+            "peak_fwhm_entry": "fwhm",
+            "peak_alpha_entry": "alpha"
+        }
+        for widget_name, attr in entries.items():
+            entry = self.get_widget(widget_name)
+            constraints = self.parse_peak_entry(entry.get_text())
+            peak.set_constraint(attr, **constraints)
         model_combo = self.get_widget("peak_model_combo")
-        alpha_entry = self.get_widget("peak_alpha_entry")
-
         peak.shape = peak.shapes[model_combo.get_active()]
-        position_kwargs = self.parse_peak_entry(position_entry.get_text())
-        area_kwargs = self.parse_peak_entry(area_entry.get_text())
-        fwhm_kwargs = self.parse_peak_entry(fwhm_entry.get_text())
-        alpha_kwargs = self.parse_peak_entry(alpha_entry.get_text())
 
-        peak.set_constraint("position", **position_kwargs)
-        peak.set_constraint("area", **area_kwargs)
-        peak.set_constraint("fwhm", **fwhm_kwargs)
-        peak.set_constraint("alpha", **alpha_kwargs)
+    def on_peak_name_entry_changed(self, *_args):
+        """Change the active peak's name."""
+        active_peaks = self.state.active_peaks
+        if len(active_peaks) != 1:
+            return
+        peak = active_peaks[0]
+        name_entry = self.get_widget("peak_name_entry")
+        name = name_entry.get_text()
+        peak.label = name
 
     def on_fit(self, *_args):
         """Do the fucking fitting."""
-        active_spectra = self._gui.active_spectra
+        active_spectra = self.state.active_spectra
         for spectrum in active_spectra:
             spectrum.do_fit()
 
@@ -386,36 +361,20 @@ class FitController():
                 kwargs["expr"] = param_string.strip()
         return kwargs
 
-    def on_peak_name_entry_changed(self, *_args):
-        """Change the active peak's name."""
-        active_peaks = self._gui.active_peaks
-        if len(active_peaks) != 1:
-            return
-        peak = active_peaks[0]
 
-        name_entry = self.get_widget("peak_name_entry")
-        name = name_entry.get_text()
-        peak.label = name
-
-
-class ViewController():
+class ViewController(Operator):
     """Contains methods for user initiated view manipulation."""
-    def __init__(self, get_widget, gui, spectra):
-        self.get_widget = get_widget
-        self._gui = gui
-        self._spectra = spectra
-
     def on_show_selected_spectra(self, *_args):
         """Callback for showing all selected spectra."""
-        spectra = self._gui.selected_spectra
-        self._gui.active_spectra = spectra
+        spectra = self.state.selected_spectra
+        self.state.active_spectra = spectra
 
     def on_spectrum_view_row_activated(self, treeview, path, _col):
         """Callback for row activation by Enter key or double click."""
         model = treeview.get_model()
         iter_ = model.get_iter(path)
         spectrum = model.get(iter_, 0)[0]
-        self._gui.active_spectra = [spectrum]
+        self.state.active_spectra = [spectrum]
 
     def on_spectrum_view_clicked(self, treeview, event):
         """Callback for button-press-event, popups the menu on right click.
@@ -435,11 +394,9 @@ class ViewController():
     def on_spectrum_view_filter_changed(self, *_args):
         """Applies search term from entry.get_text() to the TreeView in column
         combo.get_active_text()."""
-        # damn user_data from glade does not allow to pass both widgets here
-        # as arguments, so they must be fetched from the builder
         combo = self.get_widget("spectrum_view_search_combo")
         entry = self.get_widget("spectrum_view_search_entry")
-        self._gui.spectra_tv_filter = (
+        self.state.spectra_tv_filter = (
             combo.get_active_text(),
             entry.get_text()
         )
@@ -449,28 +406,26 @@ class ViewController():
         model = treeview.get_model()
         iter_ = model.get_iter(path)
         peak = model.get(iter_, 0)[0]
-        self._gui.active_peaks = [peak]
-        # self._gui.active_peaks = self._gui.selected_peaks
+        self.state.active_peaks = [peak]
 
     def on_show_rsfs(self, *_args):
         """Opens an RSF dialog."""
         dialog = self.get_widget("rsf_dialog")
         source_combo = self.get_widget("rsf_combo")
         element_entry = self.get_widget("rsf_entry")
-        source_combo.set_active_id(self._gui.photon_source_id)
-        element_entry.set_text(" ".join(self._gui.rsf_elements))
+        source_combo.set_active_id(self.state.photon_source_id)
+        element_entry.set_text(" ".join(self.state.rsf_elements))
         response = dialog.run()
         if response == Gtk.ResponseType.APPLY:
             elements = re.findall(r"[\w]+", element_entry.get_text())
-            self._gui.rsf_elements = [element.title() for element in elements]
-            self._gui.photon_source = source_combo.get_active_text()
+            self.state.rsf_elements = [element.title() for element in elements]
+            self.state.photon_source = source_combo.get_active_text()
         elif response == Gtk.ResponseType.REJECT:
-            self._gui.rsf_elements = []
+            self.state.rsf_elements = []
         dialog.hide()
 
     def on_center_plot(self, *_args):
-        """Centers the plot via the navbar command.
-        """
+        """Centers the plot via the navbar command."""
         navbar = self.get_widget("plot_toolbar")
         navbar.center()
 
