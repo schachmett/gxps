@@ -27,10 +27,11 @@ class Operator:
     """Meta class for objects that contain the main functions of the
     application as methods.
     """
-    def __init__(self, get_widget, state, data):
+    def __init__(self, get_widget, state, data, bus):
         self.get_widget = get_widget
         self.state = state
         self.data = data
+        self.bus = bus
 
 
 class Help(Operator):
@@ -91,7 +92,10 @@ class File(Operator):
         if not merge:
             self.data.clear()
         for spectrum in spectra:
-            self.data.add_spectrum(spectrum)
+            spectrum = self.data.add_spectrum(spectrum)
+            spectrum.register_queue(self.bus)
+            for peak in spectrum.peaks:
+                peak.register_queue(self.bus)
         if not merge:
             self.state.active_spectra = [spectra[idx] for idx in active_idxs]
             self.state.current_project = fname
@@ -138,7 +142,8 @@ class File(Operator):
             for fname in dialog.get_filenames():
                 specdicts.extend(gxps.io.parse_spectrum_file(fname))
             for specdict in specdicts:
-                self.data.add_spectrum(**specdict)
+                spectrum = self.data.add_spectrum(**specdict)
+                spectrum.register_queue(self.bus)
         dialog.hide()
 
     def ask_for_save(self):
@@ -285,9 +290,11 @@ class Fit(Operator):
             for spectrum in self.state.active_spectra:
                 height -= spectrum.background_of_E(position)
                 name = self.state.next_peak_name
-                shape = "PseudoVoigt"
-                spectrum.add_peak(name, position=position, angle=angle,
-                                  height=height, shape=shape)
+                shape = "DoniachSunjic"
+                # shape = "PseudoVoigt"
+                peak = spectrum.add_peak(name, position=position, angle=angle,
+                                         height=height, shape=shape)
+                peak.register_queue(self.bus)
         wedgeprops = {}
         navbar = self.get_widget("plot_toolbar")
         navbar.get_wedge(add_peak, **wedgeprops)
@@ -318,10 +325,14 @@ class Fit(Operator):
             "peak_fwhm_entry": "fwhm",
             "peak_alpha_entry": "alpha"
         }
+        constraints = []
         for widget_name, attr in entries.items():
             entry = self.get_widget(widget_name)
-            constraints = self.parse_peak_entry(entry.get_text())
-            peak.set_constraint(attr, **constraints)
+            constraint = self.parse_peak_entry(entry.get_text())
+            constraint["param_alias"] = attr
+            constraints.append(constraint)
+        for constraint in constraints:
+            peak.set_constraint(**constraint)
         model_combo = self.get_widget("peak_model_combo")
         peak.shape = peak.shapes[model_combo.get_active()]
 
@@ -362,7 +373,7 @@ class Fit(Operator):
         return kwargs
 
 
-class ViewController(Operator):
+class ViewC(Operator):
     """Contains methods for user initiated view manipulation."""
     def on_show_selected_spectra(self, *_args):
         """Callback for showing all selected spectra."""

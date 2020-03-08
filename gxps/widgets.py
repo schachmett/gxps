@@ -17,7 +17,10 @@ from gxps import (
     __appname__, __version__, __authors__, __website__
     )
 from gxps.state import State
-from gxps.canvas_tools import PeakSelector, SpanSelector, PointSelector
+from gxps.canvas_tools import (
+    PeakSelector, SpanSelector, PointSelector,
+    DraggableVLine
+    )
 
 
 LOG = logging.getLogger(__name__)
@@ -138,6 +141,34 @@ class GXPSCanvas(FigureCanvasGTK3Agg):
                 right=False,
                 labelbottom=False
             )
+
+
+class DraggableVLineContainer(Gtk.DrawingArea):
+    """Contains all active and usable draggable vlines. Provides methods
+    for adding new ones and connecting them to the bus.
+    This object is invisibly added in the same Gtk.Box where the canvas
+    is."""
+    __gtype_name__ = "GXPSCanvasObjects"
+
+    def __init__(self):
+        self.bus = None
+        self._lines = []
+
+    def set_bus(self, bus):
+        """Set the bus."""
+        self.bus = bus
+
+    def add_line(self, line, spectrum):
+        """Add a new line and attach the bus to it."""
+        if not self.bus:
+            raise RuntimeError("DraggableVLineContainer has not bus")
+        dline = DraggableVLine(line, spectrum)
+        self._lines.append(dline)
+        dline.register_queue(self.bus)
+
+    def clear(self):
+        """Remove all lines."""
+        self._lines.clear()
 
 
 class GXPSEditSpectrumDialog(Gtk.Dialog):

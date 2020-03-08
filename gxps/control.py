@@ -3,7 +3,7 @@
 
 import logging
 
-from gxps.controller import File, Edit, Fit, ViewController, Help
+from gxps.controller import File, Edit, Fit, ViewC, Help
 
 
 LOG = logging.getLogger(__name__)
@@ -19,11 +19,11 @@ class CommandSender:
         self.get_widget = get_widget
         self.history = History()
 
-        self._file = File(get_widget, self.state, self.data)
-        self._edit = Edit(get_widget, self.state, self.data)
-        self._fit = Fit(get_widget, self.state, self.data)
-        self._view = ViewController(get_widget, self.state, self.data)
-        self._help = Help(get_widget, self.state, self.data)
+        self._file = File(get_widget, self.state, self.data, self.bus)
+        self._edit = Edit(get_widget, self.state, self.data, self.bus)
+        self._fit = Fit(get_widget, self.state, self.data, self.bus)
+        self._view = ViewC(get_widget, self.state, self.data, self.bus)
+        self._help = Help(get_widget, self.state, self.data, self.bus)
 
         self.callbacks = {
             # File actions
@@ -78,7 +78,6 @@ class CommandSender:
                 self._view.on_spectrum_view_row_activated,
             "on_peak_view_row_activated":
                 self._view.on_peak_view_row_activated,
-            "on_spectrum_chooser_combo_changed": lambda *x: None,
 
             # Help actions
             "view-logfile": self._help.on_view_logfile,
@@ -88,14 +87,14 @@ class CommandSender:
 
         self.bus.subscribe(self._fit.on_change_region, "changed-vline", 5)
 
-    def __call__(self, *args): #, _object, _irr, command_name):
+    def __call__(self, *args):
         key = args[-1]
         if key not in self.callbacks:
             LOG.warning("Action/Handler {} does not exist".format(key))
-            return
+            return False
         do_func = self.callbacks[key]
         command = Command(do_func)
-        self.history.do_command(command, *args[:-1])
+        return self.history.do_command(command, *args[:-1])
 
     def callback(self, *_args):
         """Manages observer-style subscriptions."""
@@ -116,9 +115,10 @@ class History:
         """Executes a command."""
         if command.undoable:
             self._commands_redoable.clear()
-        command(*args, **kwargs)
+        return_value = command(*args, **kwargs)
         if command.undoable:
             self._commands_done.append(command)
+        return return_value
 
     def undo(self):
         """Undoes last command."""

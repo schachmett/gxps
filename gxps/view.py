@@ -14,7 +14,6 @@ from gi.repository import Gtk, Pango, GLib
 from gxps import __appname__, COLORS
 from gxps.io import get_element_rsfs
 from gxps.spectrum import Peak
-from gxps.canvas_tools import DraggableVLine
 
 
 LOG = logging.getLogger(__name__)
@@ -22,56 +21,106 @@ LOG = logging.getLogger(__name__)
 
 class ViewManager():
     """Helper class for instantiating all the GUI manager classes."""
-    def __init__(self, app, gui, spectra):
-        self.complement_builder(app.builder)
-        self.window_vbehaviour = WindowBehaviour(app, gui, spectra)
-        self.plot_vmanager = PlotManager(app, gui, spectra)
-        self.spectrum_vmanager = SpectrumPanelManager(app, gui, spectra)
-        self.peak_vmanager = PeakPanelManager(app, gui, spectra)
-        self.edit_vmanager = EditDialogManager(app, gui, spectra)
+    # pylint: disable=too-many-instance-attributes
+    def __init__(self, app, state, data):
+        self.bus = app.bus
+        self.data = data
+        self.state = state
+        self.get_widget = app.get_widget
 
-    @staticmethod
-    def complement_builder(builder):
-        """Do trivial GTK stuff that the builder can not do."""
-        # Save confirmation dialog
-        save_conf_dialog = builder.get_object("save_confirmation_dialog")
-        save_conf_dialog.set_accels()
-        # Plot navigation toolbar
-        navbar = builder.get_object("plot_toolbar")
-        navbar.startup(builder)
-        # RSF dialog
-        rsf_dialog = builder.get_object("rsf_dialog")
-        rsf_entry = builder.get_object("rsf_entry")
-        def apply_rsf(*_args):
-            """Let the dialog send APPLY response."""
-            rsf_dialog.emit("response", Gtk.ResponseType.APPLY)
-        rsf_entry.connect("activate", apply_rsf)
+        self._window = self._instantiate_window()
+        self._plot = self._instantiate_plot()
+        self._spectra_panel = self._instantiate_spectra_panel()
+        self._peaks_panel = self._instantiate_peaks_panel()
+        self._edit_dialog = self._instantiate_edit_dialog()
+
+        vlines = self.get_widget("canvas_objects")
+        vlines.set_bus(self.bus)
+
+    def _instantiate_window(self):
+        """Make a window manager."""
+        window = Window(self.get_widget, self.state, self.data)
+        signals = ("changed-project", )
+        for signal in signals:
+            self.bus.subscribe(window.update_titlebar, signal)
+        return window
+
+    def _instantiate_plot(self):
+        """Make a Plot manager."""
+        plot = Plot(self.get_widget, self.state, self.data)
+        signals = ("changed-active", "changed-rsf", "changed-spectrum",
+                   "changed-fit", "changed-peak")
+        for signal in signals:
+            self.bus.subscribe(plot.update, signal, priority=10)
+        return plot
+
+    def _instantiate_spectra_panel(self):
+        """Make a SpectraPanelManager."""
+        spectra_panel = SpectraPanel(self.get_widget, self.state, self.data)
+        signals = (
+            "changed-spectrum",
+            "changed-spectrum-meta",
+            "changed-spectra",
+            "changed-active"
+        )
+        for signal in signals:
+            self.bus.subscribe(spectra_panel.update_data, signal)
+        self.bus.subscribe(spectra_panel.update_filter, "changed-tv")
+        self.bus.subscribe(spectra_panel.update_controls, "changed-spectrum")
+        self.bus.subscribe(spectra_panel.update_controls, "changed-active")
+        return spectra_panel
+
+    def _instantiate_peaks_panel(self):
+        """Make a PeakPanelManager."""
+        peaks_panel = PeakPanel(self.get_widget, self.state, self.data)
+        signals = (
+            "changed-peak",
+            "changed-peak-meta",
+            "changed-fit",
+            "changed-active"
+        )
+        for signal in signals:
+            self.bus.subscribe(peaks_panel.update_data, signal)
+            self.bus.subscribe(peaks_panel.update_controls, signal)
+        return peaks_panel
+
+    def _instantiate_edit_dialog(self):
+        """Make a EditDialogManager."""
+        edit_dialog = EditDialog(self.get_widget, self.state, self.data)
+        self.bus.subscribe(edit_dialog.update, "changed-editing-spectra")
+        return edit_dialog
 
 
+class View:
+    """Meta class for objects that contain the main functions of the
+    application as methods.
+    """
+    def __init__(self, get_widget, state, data):
+        self.get_widget = get_widget
+        self.state = state
+        self.data = data
 
-class WindowBehaviour():
+
+class Window(View):
     """Manages all things that regard the behavior and appearance of the
     main window.
     """
-    def __init__(self, app, gui, spectra):
-        self._app = app
-        self._gui = gui
-        self._spectra = spectra
-        self._win = self._app.builder.get_object("main_window")
-        statusbar = self._app.builder.get_object("statusbar")
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        statusbar = self.get_widget("statusbar")
         self._statusbar_id = statusbar.get_context_id("")
-        self._app.bus.subscribe(self.update_titlebar, "changed-project")
 
     def update_titlebar(self, _event):
         """Updates the title bar to show the current project."""
-        fname = self._gui.current_project
-        isaltered = self._gui.project_isaltered
+        fname = self.state.current_project
+        isaltered = self.state.project_isaltered
+        win = self.get_widget("main_window")
         if fname:
             if isaltered:
                 fname += "*"
-            self._win.set_title(u"{} — {}".format(fname, __appname__))
+            win.set_title(u"{} — {}".format(fname, __appname__))
         else:
-            self._win.set_title(__appname__)
+            win.set_title(__appname__)
 
     def display(self, event):
         """Updates the statusbar message."""
@@ -81,7 +130,7 @@ class WindowBehaviour():
                 LOG.info("statusbar: {}".format(message))
         except AttributeError:
             pass
-        statusbar = self._app.builder.get_object("statusbar")
+        statusbar = self.get_widget("statusbar")
         message_id = statusbar.push(self._statusbar_id, message)
         def erase_message():
             """Pop message from the statusbar."""
@@ -93,31 +142,15 @@ class WindowBehaviour():
             pass
 
 
-class PlotManager():
+class Plot(View):
     """Draws the spectra onto the canvas. Listens to GUIState for what
     exactly to draw.
     """
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, app, gui, spectra):
-        self._app = app
-        self._gui = gui
-        self._spectra = spectra
-        # Set the canvas up
-        self._canvas = self._app.builder.get_object("main_canvas")
-        self._figure = self._canvas.figure
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._canvas = self.get_widget("main_canvas")
         self._ax = self._canvas.ax
-        self._draglines = []
-        self._navbar = self._app.builder.get_object("plot_toolbar")
-        # Connect to changes of the states
-        signals = (
-            "changed-active",
-            "changed-rsf",
-            "changed-spectrum",
-            "changed-fit",
-            "changed-peak"
-        )
-        for signal in signals:
-            self._app.bus.subscribe(self.update, signal, priority=10)
 
     def update(self, event, keepaxes=True):
         """Updates plot by redrawing the whole thing. Relies on
@@ -125,8 +158,8 @@ class PlotManager():
         callback function for when the plot should change.
         """
         if event.signal == "changed-spectrum":
-            # if event.source not in self._gui.active_spectra:
-            #     return
+            if not set(event.source) & set(self.state.active_spectra):
+                return
             for attr in event.properties["attr"]:
                 if attr in ("normalization_type", "normalization_divisor"):
                     keepaxes = False
@@ -147,11 +180,14 @@ class PlotManager():
         else:
             self._canvas.center_view()
         self._canvas.draw_idle()
-        self._navbar.disable_tools()
+        navbar = self.get_widget("plot_toolbar")
+        navbar.disable_tools()
 
     def _plot_spectra(self):
         colors = cycle(COLORS["Plotting"]["spectra"].split(","))
-        for spectrum in self._gui.active_spectra:
+        vlines = self.get_widget("canvas_objects")
+        vlines.clear()
+        for spectrum in self.state.active_spectra:
             color = next(colors).strip()
             line = {
                 "color": color,
@@ -166,12 +202,9 @@ class PlotManager():
                 "linestyle": "--",
                 "alpha": 1
             }
-            self._draglines.clear()
             for bound in spectrum.background_bounds:
                 linewidget = self._ax.axvline(bound, 0, 1, **line)
-                dragline = DraggableVLine(linewidget, spectrum)
-                dragline.register_queue(self._app.bus)
-                self._draglines.append(dragline)
+                vlines.add_line(linewidget, spectrum)
             line = {
                 "color": COLORS["Plotting"]["region-background"],
                 "linewidth": 1,
@@ -191,10 +224,10 @@ class PlotManager():
         inactive_color = COLORS["Plotting"]["peak"]
         active_color = COLORS["Plotting"]["peak-active"]
         sum_color = COLORS["Plotting"]["peak-sum"]
-        for spectrum in self._gui.active_spectra:
+        for spectrum in self.state.active_spectra:
             for peak in spectrum.peaks:
                 line = {}
-                if peak in self._gui.active_peaks:
+                if peak in self.state.active_peaks:
                     line = {
                         "color": active_color,
                         "linewidth": 1,
@@ -233,9 +266,9 @@ class PlotManager():
         element_colors = cycle(COLORS["Plotting"]["rsf-vlines"].split(","))
         max_rsf = 1e-9
         orbitals = []
-        for element in self._gui.rsf_elements:
+        for element in self.state.rsf_elements:
             color = next(element_colors).strip()
-            element = get_element_rsfs(element, self._gui.photon_source)
+            element = get_element_rsfs(element, self.state.photon_source)
             for orbital in element:
                 max_rsf = max(orbital["RSF"], max_rsf)
                 orbital["color"] = color
@@ -260,38 +293,22 @@ class PlotManager():
             )
 
 
-class SpectrumPanelManager():
+class SpectraPanel(View):
     """Manages representation of the spectra inside a treeview. Data
     is pulled from the SpectrumContainer and user changeable representation
     attributes are fetched from GUIState.
     Also manages the widgets for manipulating spectra in the same panel.
     """
-    def __init__(self, app, gui, spectra):
-        self._app = app
-        self._gui = gui
-        self._spectra = spectra
-
-        tvmenu = self._app.builder.get_object("spectrum_view_context_menu")
-        treeview = self._app.builder.get_object("spectrum_view")
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tvmenu = self.get_widget("spectrum_view_context_menu")
+        treeview = self.get_widget("spectrum_view")
         tvmenu.attach_to_widget(treeview, None)
-        norm_combo = self._app.builder.get_object("normalization_combo")
+        norm_combo = self.get_widget("normalization_combo")
         renderer = norm_combo.get_cells()[0]
         renderer.set_property("width-chars", 10)
-
         self._make_columns()
         self._setup_filter()
-
-        signals = (
-            "changed-spectrum",
-            "changed-spectrum-meta",
-            "changed-spectra",
-            "changed-active"
-        )
-        for signal in signals:
-            self._app.bus.subscribe(self.update_data, signal)
-        self._app.bus.subscribe(self.update_filter, "changed-tv")
-        self._app.bus.subscribe(self.update_controls, "changed-spectrum")
-        self._app.bus.subscribe(self.update_controls, "changed-active")
 
     def update_filter(self, event):
         """Updates the filtering with filter parameters from GUIState.
@@ -300,8 +317,7 @@ class SpectrumPanelManager():
         if event.signal == "changed-tv":
             if "filter" not in event.properties["attr"]:
                 return
-        treemodelfilter = self._app.builder.get_object(
-            "spectrum_filter_treestore")
+        treemodelfilter = self.get_widget("spectrum_filter_treestore")
         treemodelfilter.refilter()
 
     def update_data(self, event):
@@ -311,14 +327,14 @@ class SpectrumPanelManager():
         if event.signal == "changed-active":
             if "spectra" not in event.properties["attr"]:
                 return
-        selected_spectra = self._gui.selected_spectra
+        selected_spectra = self.state.selected_spectra
         # update model
-        treestore = self._app.builder.get_object("spectrum_treestore")
+        treestore = self.get_widget("spectrum_treestore")
         treestore.clear()
-        for spectrum in self._spectra.spectra:
+        for spectrum in self.data.spectra:
             row = [
                 str(spectrum.get_meta(attr))
-                for attr in list(self._gui.titles["spectrum_view"].keys())
+                for attr in list(self.state.titles["spectrum_view"].keys())
             ]
             treestore.append(parent=None, row=[spectrum] + row)
         # reset selected spectra
@@ -334,14 +350,14 @@ class SpectrumPanelManager():
         if event.signal == "changed-active":
             if "spectra" not in event.properties["attr"]:
                 return
-        active_spectra = self._gui.active_spectra
-        cal_spinbutton = self._app.builder.get_object("calibration_spinbutton")
-        cal_caution = self._app.builder.get_object("cal_caution_image")
-        norm_combo = self._app.builder.get_object("normalization_combo")
-        norm_entry = self._app.builder.get_object("normalization_entry")
-        norm_caution = self._app.builder.get_object("norm_caution_image")
+        active_spectra = self.state.active_spectra
+        cal_spinbutton = self.get_widget("calibration_spinbutton")
+        cal_caution = self.get_widget("cal_caution_image")
+        norm_combo = self.get_widget("normalization_combo")
+        norm_entry = self.get_widget("normalization_entry")
+        norm_caution = self.get_widget("norm_caution_image")
         if not active_spectra:
-            norm_combo.set_active_id(None)
+            norm_combo.set_active(-1)
             norm_caution.set_visible(False)
             cal_spinbutton.set_value(0.0)
             cal_caution.set_visible(False)
@@ -350,11 +366,11 @@ class SpectrumPanelManager():
         else:
             norm_types = [s.normalization_type for s in active_spectra]
             if len(set(norm_types)) > 1:
-                norm_combo.set_active_id(None)
+                norm_combo.set_active(-1)
                 norm_caution.set_visible(True)
                 norm_entry.set_sensitive(False)
             else:
-                normid = self._gui.titles["norm_type_ids"][norm_types[0]]
+                normid = self.state.titles["norm_type_ids"][norm_types[0]]
                 norm_combo.set_active(int(normid))
                 # this circumvents signal emission instead
                 # of this: norm.set_active_id(normid)
@@ -375,38 +391,36 @@ class SpectrumPanelManager():
             else:
                 cal_spinbutton.set_value(cals[0])
                 cal_caution.set_visible(False)
-                # is manual normalization working correctly?
 
     def _set_selection(self, spectra):
         """Selects rows representing spectra."""
-        selection = self._app.builder.get_object("spectrum_selection")
-        treemodelsort = self._app.builder.get_object("spectrum_sort_treestore")
+        selection = self.get_widget("spectrum_selection")
+        treemodelsort = self.get_widget("spectrum_sort_treestore")
         selection.unselect_all()
         for row in treemodelsort:
             if row[0] in spectra:
                 selection.select_iter(row.iter)
 
     def _make_columns(self):
-        # render function for making plotted spectra bold and light blue
-        treeview = self._app.builder.get_object("spectrum_view")
+        treeview = self.get_widget("spectrum_view")
         highlight_bg = COLORS["Treeview"]["tv-highlight-bg"]
         lowlight_bg = treeview.style_get_property("even-row-color")
         def render_isplotted(_col, renderer, model, iter_, *_data):
             """Renders the cell light blue if this spectrum is plotted."""
+            # render function for making plotted spectra bold and light blue
             spectrum = model.get_value(iter_, 0)
-            if spectrum in self._gui.active_spectra:
-            # if model.get_value(iter_, 1):
+            if spectrum in self.state.active_spectra:
                 renderer.set_property("cell-background", highlight_bg)
                 renderer.set_property("weight", Pango.Weight.BOLD)
             else:
                 renderer.set_property("cell-background", lowlight_bg)
                 renderer.set_property("weight", Pango.Weight.NORMAL)
         # the other columns are simple, just apply the render_isplotted func
-        for attr in self._gui.spectra_tv_columns:
+        for attr in self.state.spectra_tv_columns:
             renderer = Gtk.CellRendererText(xalign=0)
-            title = self._gui.titles["spectrum_view"][attr]
+            title = self.state.titles["spectrum_view"][attr]
             # skip first column, it is "spectrum"
-            idx = list(self._gui.titles["spectrum_view"].keys()).index(attr)
+            idx = list(self.state.titles["spectrum_view"].keys()).index(attr)
             column = Gtk.TreeViewColumn(title, renderer, text=idx + 1)
             column.set_cell_data_func(renderer, render_isplotted)
             column.set_sort_column_id(idx + 1)
@@ -416,66 +430,51 @@ class SpectrumPanelManager():
 
     def _setup_filter(self):
         # filling the combobox that determines self.tv_filter[0]
-        filtercombo = self._app.builder.get_object(
-            "spectrum_view_search_combo")
-        treemodelfilter = self._app.builder.get_object(
-            "spectrum_filter_treestore")
-        for i, meta_attr in enumerate(self._gui.spectra_tv_columns):
-            title = self._gui.titles["spectrum_view"][meta_attr]
+        filtercombo = self.get_widget("spectrum_view_search_combo")
+        treemodelfilter = self.get_widget("spectrum_filter_treestore")
+        for i, meta_attr in enumerate(self.state.spectra_tv_columns):
+            title = self.state.titles["spectrum_view"][meta_attr]
             filtercombo.append_text(title)
-            if meta_attr == self._gui.spectra_tv_filter[0]:
+            if meta_attr == self.state.spectra_tv_filter[0]:
                 filtercombo.set_active(i)
         # this function looks into self.tv_filter and executes the regex
         # matching, returning True if the row should be visible
         def filter_func(treemodel, iter_, *_data):
             """Returns True only for rows whose values for the attr
             from self.tv_filter matches the regex from self.tv_filter."""
-            meta_attr, search_term = self._gui.spectra_tv_filter
+            meta_attr, search_term = self.state.spectra_tv_filter
             if not meta_attr or not search_term:
                 return True
             regex = re.compile(r".*{}.*".format(search_term), re.IGNORECASE)
-            # skip first two columns, they are "is_actve" and "spectrum"
-            col_index = self._gui.spectra_tv_columns.index(meta_attr) + 1
+            # skip first column, it is "spectrum"
+            col_index = self.state.spectra_tv_columns.index(meta_attr) + 1
             return re.match(regex, treemodel.get(iter_, col_index)[0])
         treemodelfilter.set_visible_func(filter_func)
 
 
-class PeakPanelManager():
+class PeakPanel(View):
     """Manages representation of the peaks inside a treeview. Data
     is pulled from the SpectrumContainer and user changeable representation
     attributes are fetched from GUIState.
     TODO: Manage the peak manipulation, e.g. manage constraints
     """
-    def __init__(self, app, gui, spectra):
-        self._app = app
-        self._gui = gui
-        self._spectra = spectra
-
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._make_columns()
-
-        signals = (
-            "changed-peak",
-            "changed-peak-meta",
-            "changed-fit",
-            "changed-active"
-        )
-        for signal in signals:
-            self._app.bus.subscribe(self.update_data, signal)
-            self._app.bus.subscribe(self.update_controls, signal)
 
     def update_data(self, _event):
         """Updates TreeModel with data from the SpectrumContainer.
         To be used as callback function.
         """
-        active_peaks = self._gui.active_peaks
+        active_peaks = self.state.active_peaks
         # update model
-        treestore = self._app.builder.get_object("peak_treestore")
+        treestore = self.get_widget("peak_treestore")
         treestore.clear()
-        for spectrum in self._gui.active_spectra:
+        for spectrum in self.state.active_spectra:
             for peak in spectrum.peaks:
                 row = [
                     self.format_peak_attr(peak, attr)
-                    for attr in list(self._gui.titles["peak_view"].keys())
+                    for attr in list(self.state.titles["peak_view"].keys())
                 ]
                 treestore.append(parent=None, row=[peak] + row)
         # reset selected spectra
@@ -483,20 +482,20 @@ class PeakPanelManager():
 
     def update_controls(self, event):
         """Updates the entries representing peak parameters."""
-        active_peaks = self._gui.active_peaks
+        active_peaks = self.state.active_peaks
         if event.signal in ("changed-peak", "changed-peak-meta"):
             if not set(event.source) & set(active_peaks):
                 return
         if event.signal == "changed-fit":
-            if not set(event.source) & set(self._gui.active_spectra):
+            if not set(event.source) & set(self.state.active_spectra):
                 return
-        label_entry = self._app.builder.get_object("peak_name_entry")
-        position_entry = self._app.builder.get_object("peak_position_entry")
-        area_entry = self._app.builder.get_object("peak_area_entry")
-        fwhm_entry = self._app.builder.get_object("peak_fwhm_entry")
-        model_combo = self._app.builder.get_object("peak_model_combo")
-        alpha_label = self._app.builder.get_object("peak_alpha_label")
-        alpha_entry = self._app.builder.get_object("peak_alpha_entry")
+        label_entry = self.get_widget("peak_name_entry")
+        position_entry = self.get_widget("peak_position_entry")
+        area_entry = self.get_widget("peak_area_entry")
+        fwhm_entry = self.get_widget("peak_fwhm_entry")
+        model_combo = self.get_widget("peak_model_combo")
+        alpha_label = self.get_widget("peak_alpha_label")
+        alpha_entry = self.get_widget("peak_alpha_entry")
 
         if len(active_peaks) != 1:
             label_entry.set_text("")
@@ -555,8 +554,10 @@ class PeakPanelManager():
                 "{:.2f}<span color='#999999' font_size='xx-small'> {}</span>"
                 "".format(constraints["value"], cstring))
         if attr == "name":
-            if len(self._gui.active_spectra) >= 2:
-                formatted = "{} ({})".format(peak.name, peak.spectrum.name)
+            if len(self.state.active_spectra) >= 2:
+                formatted = (
+                    "{}<span color='#aaaaaa' font_size='x-small'> ({})</span>"
+                    "".format(peak.name, peak.spectrum.name))
             else:
                 formatted = str(peak.name)
         if attr in ("label", "shape"):
@@ -582,24 +583,23 @@ class PeakPanelManager():
 
     def _set_selection(self, peaks):
         """Selects rows representing spectra."""
-        selection = self._app.builder.get_object("peak_selection")
-        treemodelsort = self._app.builder.get_object("peak_sort_treestore")
+        selection = self.get_widget("peak_selection")
+        treemodelsort = self.get_widget("peak_sort_treestore")
         selection.unselect_all()
         for row in treemodelsort:
             if row[0] in peaks:
                 selection.select_iter(row.iter)
 
     def _make_columns(self):
-        # render function for making plotted spectra bold and light blue
-        treeview = self._app.builder.get_object("peak_view")
+        treeview = self.get_widget("peak_view")
         highlight_bg = COLORS["Treeview"]["tv-highlight-bg"]
         lowlight_bg = treeview.style_get_property("even-row-color")
         def render_constraints(_col, renderer, model, iter_, idx):
             """Renders the cell light blue if this peak is active."""
+            # render function for making plotted spectra bold and light blue
             peak = model.get_value(iter_, 0)
             value = model.get_value(iter_, idx + 1)
-            if peak in self._gui.active_peaks:
-            # if model.get_value(iter_, 1):
+            if peak in self.state.active_peaks:
                 renderer.set_property("cell-background", highlight_bg)
                 renderer.set_property("weight", Pango.Weight.BOLD)
             else:
@@ -607,11 +607,11 @@ class PeakPanelManager():
                 renderer.set_property("weight", Pango.Weight.NORMAL)
             renderer.set_property("markup", value)
         # the other columns are simple, just apply the render_isplotted func
-        for attr in self._gui.peak_tv_columns:
+        for attr in self.state.peak_tv_columns:
             renderer = Gtk.CellRendererText(xalign=0)
-            title = self._gui.titles["peak_view"][attr]
+            title = self.state.titles["peak_view"][attr]
+            idx = list(self.state.titles["peak_view"].keys()).index(attr)
             # skip first column, it is "peak"
-            idx = list(self._gui.titles["peak_view"].keys()).index(attr)
             column = Gtk.TreeViewColumn(title, renderer, text=idx + 1)
             column.set_cell_data_func(renderer, render_constraints, idx)
             column.set_sort_column_id(idx + 1)
@@ -620,21 +620,17 @@ class PeakPanelManager():
             treeview.append_column(column)
 
 
-class EditDialogManager():
+class EditDialog(View):
     """Manages the dialog for editing spectra."""
     _exclusion_key = " (mult.)"
-    def __init__(self, app, gui, spectra):
-        self._app = app
-        self._gui = gui
-        self._spectra = spectra
-        self._dialog = self._app.builder.get_object("edit_spectrum_dialog")
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._dialog = self.get_widget("edit_spectrum_dialog")
         self._dialog.exclusion_key = self._exclusion_key
-        self._app.bus.subscribe(self.update_dialog, "changed-editing-spectra")
-        # self._gui.connect("changed-editing-spectra", self.update_dialog)
 
-    def update_dialog(self, *_args):
+    def update(self, *_args):
         """Updates the dialog to represent the spectra to be edited."""
-        spectra = self._gui.editing_spectra
+        spectra = self.state.editing_spectra
         self._dialog.flush()
         def get_value_string(attr, separator=" | "):
             """Returns string to go inside the value fields."""
@@ -650,11 +646,15 @@ class EditDialogManager():
                 valuestring = values[0]
             return valuestring
 
-        for attr, title in self._gui.titles["static_specinfo"].items():
-            valstring = get_value_string(attr, separator="\n")
-            valstring = valstring.replace("None", "NO VALUE SET")
+        for attr, title in self.state.titles["static_specinfo"].items():
+            try:
+                valstring = get_value_string(attr, separator="\n")
+            except AttributeError:
+                valstring = "NO VALUE SET"
             self._dialog.add_non_editable_row(title, valstring)
-        for attr, title in self._gui.titles["editing_dialog"].items():
-            valstring = get_value_string(attr)
-            valstring = valstring.replace("None", "NO VALUE SET")
+        for attr, title in self.state.titles["editing_dialog"].items():
+            try:
+                valstring = get_value_string(attr, separator="\n")
+            except AttributeError:
+                valstring = "NO VALUE SET"
             self._dialog.add_editor_row(attr, title, valstring)

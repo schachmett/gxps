@@ -19,7 +19,8 @@ from gxps.processing import (
     make_increasing,
     calculate_normalization_divisor,
     pah2fwhm,
-    pah2area
+    pah2area,
+    DoniachSunjicModel,
 )
 
 
@@ -47,8 +48,6 @@ class SpectrumContainer(Observable):
         if not spectrum:
             spectrum = ModeledSpectrum(**specdict)
         self._spectra.append(spectrum)
-        # QODO
-        spectrum.register_queue(self._queues[0])
 
         LOG.info("Added spectrum {} to {}".format(spectrum, self))
         self.emit("changed-spectra")
@@ -163,6 +162,8 @@ class Spectrum(Observable, MetaDataContainer):
     @normalization_type.setter
     def normalization_type(self, value):
         """Normalization type has to be in self._norm_types."""
+        if self._normalization_type == value:
+            return
         if value not in self._norm_types:
             raise ValueError("Invalid normalization type '{}'".format(value))
         self._normalization_type = value
@@ -226,6 +227,8 @@ class Spectrum(Observable, MetaDataContainer):
         """Only values from self._bg_types are valid."""
         if value not in self._bg_types:
             raise ValueError("Background type {} not valid".format(value))
+        if self._background_type == value:
+            return
         self._background_type = value
         self._background = calculate_background(
             self.background_type,
@@ -362,7 +365,6 @@ class ModeledSpectrum(Spectrum):
         kwargs.pop("height", None)
         peak = Peak(name, self, **kwargs)
         self._peaks.append(peak)
-        peak.register_queue(self._queues[0])
         self.emit("changed-fit", attr="peaks")
         return peak
 
@@ -386,12 +388,24 @@ class Peak(Observable):
     """
     Provides read access to peak parameters and provides methods to
     constrain them.
+    Whereever possible, parameter "aliases" are used. Independent of
+    model, every peak should have:
+        area
+        fwhm
+        position
+    and optionally:
+        alpha
+        beta
+    in the aliases, each of these properties are mapped to "real" parameters
+    in a way that they all act similar.
+    This ensures a consistent API.
     """
-    _signals = (
-        "changed-peak",
-        "changed-peak-meta"
-    )
-    shapes = ["PseudoVoigt", "Doniach Sunjic", "Voigt"]
+    _signals = ("changed-peak", "changed-peak-meta")
+    _default_aliases = {
+        "alpha": None,
+        "beta": None
+    }
+    shapes = ["PseudoVoigt", "DoniachSunjic", "Voigt"]
 
     def __init__(
             self, name, spectrum,
@@ -411,8 +425,11 @@ class Peak(Observable):
         if self._shape == "PseudoVoigt":
             self._model = PseudoVoigtModel(prefix="{}_".format(name))
             self._model.set_param_hint("fraction", vary=False, value=alpha)
+        elif self._shape == "DoniachSunjic":
+            self._model = DoniachSunjicModel(prefix="{}_".format(name))
+            self._model.set_param_hint("gamma", vary=False, value=alpha)
         else:
-            self._model = (beta, )
+            self._model = (beta, )  # only for linting
             raise NotImplementedError("Only PseudoVoigt shape supported")
 
         self.param_aliases = {
@@ -422,22 +439,35 @@ class Peak(Observable):
         }
         if self._shape == "PseudoVoigt":
             self.param_aliases["alpha"] = "fraction"
-            self.param_aliases["beta"] = None
+        if self._shape == "DoniachSunjic":
+            self.param_aliases["alpha"] = "gamma"
 
         self.params += self._model.make_params()
-        # self.params["{}_fwhm".format(name)].set(
-        #     value=abs(fwhm), vary=True, min=0
-        # )
         self.get_param("fwhm").set(value=abs(fwhm), vary=True, min=0)
-        self.get_param("sigma").set(expr="{}_fwhm/2".format(name))
         self.get_param("amplitude").set(value=abs(area), min=0)
         self.get_param("center").set(value=abs(position), min=0)
+        if self._shape == "PseudoVoigt":
+            self.get_param("sigma").set(expr="{}_fwhm/2".format(name))
+
         LOG.info("Peak '{}' created ({})".format(self.name, self))
 
-    def get_param(self, param_name):
+    def get_param_by_real_name(self, param_name):
         """Shortcut for getting the Parameter object called
         "peak.name_param_name"
         """
+        return self.params["{}_{}".format(self.name, param_name)]
+
+    def get_param(self, param_alias):
+        """Even shorter cut for getting the Parameter object
+        by the param alias.
+        """
+        aliases = {**self._default_aliases, **self.param_aliases}
+        param_name = aliases.get(param_alias, param_alias)
+        if param_name is None:
+            raise ValueError(
+                "{}s model '{}' does not support Parameter '{}'"
+                "".format(self, self.shape, param_alias)
+            )
         return self.params["{}_{}".format(self.name, param_name)]
 
     @property
@@ -480,18 +510,13 @@ class Peak(Observable):
         """
         # pylint: disable=too-many-arguments
         # pylint: disable=redefined-builtin
-        param_name = self.param_aliases[param_alias]
-        if param_name is None:
-            raise ValueError(
-                "{}s model '{}' does not support Parameter '{}'"
-                "".format(self, self.shape, param_alias)
-            )
-        param = self.get_param(param_name)
+        param = self.get_param(param_alias)
         old_par = self.get_constraints(param_alias)
 
         for arg in (value, vary, min, max):
             try:
-                if arg and abs(arg) > -1:  # fail if x is not in (None, number)
+                # fail if x is not in (None, number)
+                if arg and abs(arg) > -1:
                     pass
             except TypeError:
                 LOG.warning("Invalid constraint value '{}'".format(arg))
@@ -507,7 +532,7 @@ class Peak(Observable):
         param.set(min=min, max=max, vary=vary, value=value, expr="")
 
         if expr is not None:
-            expr = self.relation2expr(expr, param_name)
+            expr = self.relation2expr(expr, param_alias)
             try:
                 param.set(expr=expr, min=-np.inf, max=np.inf)
                 self.params.valuesdict()
@@ -522,10 +547,11 @@ class Peak(Observable):
 
     def get_constraints(self, param_alias):
         """Returns a string containing min/max or expr."""
-        param_name = self.param_aliases[param_alias]
-        if param_name is None:
+        # param_name = self.param_aliases[param_alias]
+        try:
+            param = self.get_param(param_alias)
+        except ValueError:
             return None
-        param = self.get_param(param_name)
 
         relation = ""
         if param.expr is not None:
@@ -553,9 +579,10 @@ class Peak(Observable):
         relation = re.sub(regex, param_repl, expr)
         return relation
 
-    def relation2expr(self, relation, param_name):
+    def relation2expr(self, relation, param_alias):
         """Translates a human-readable arithmetic relation to an expr string.
         """
+        param_name = self.param_aliases[param_alias]
         def name_repl(matchobj):
             """Replaces 'peakname' by 'peakname_param' (searches
             case-insensitive).
@@ -580,7 +607,7 @@ class Peak(Observable):
     def shape(self, value):
         """Sets the peak shape."""
         if value == "PseudoVoigt":
-            self._shape = value
+            self._shape = value     #TODO!
         else:
             raise NotImplementedError
 
@@ -625,6 +652,8 @@ class Peak(Observable):
         """Gives the name of the parameter alpha."""
         if self.shape == "PseudoVoigt":
             return "Alpha"
+        if self.shape == "DoniachSunjic":
+            return "Gamma"
         return None
 
     @property

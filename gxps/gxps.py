@@ -21,11 +21,14 @@ import gxps.widgets         # pylint: disable=unused-import
 LOG = logging.getLogger(__name__)
 
 
-# TODO delete spectrum chooser?
-# TODO background changer combo
-# TODO bus subscription and general reordering
-# TODO fine tune bus priority and event checking
-
+# low-priority todos:
+# rehaul background bounds
+# viewer receiving management: combine events
+# make bus firing a decorator?
+# abolish the CONFIG, COLORS and dunder singletons
+# fine tune bus priority and event checking
+# make detailed signals instead of putting everything in event properties
+# make emitting signals a decorator?
 
 
 class GXPS(Gtk.Application):
@@ -76,6 +79,7 @@ class GXPS(Gtk.Application):
         self.win.startup(app=self)
 
         # initialize all the state objects and workers
+        complement_builder(self.builder)
         self.bus = EventBus(default_policy="fire")
         self.data = SpectrumContainer()
         self.data.register_queue(self.bus)
@@ -101,7 +105,6 @@ class GXPS(Gtk.Application):
             "on_spectrum_view_button_press_event",
             "on_spectrum_view_row_activated",
             "on_peak_view_row_activated",
-            "on_spectrum_chooser_combo_changed",
         ]
         actions = [
             "project-new", "save-project", "save-project-as", "open-project",
@@ -109,7 +112,7 @@ class GXPS(Gtk.Application):
 
             "edit-spectra", "remove-spectra", "avg-selected-spectra",
 
-            "add-region", "remoge-region", "clear-regions", "add-peak",
+            "add-region", "remove-region", "clear-regions", "add-peak",
             "add-guessed-peak", "remove-peak", "clear-peaks", "fit",
 
             "show-selected-spectra", "show-atomlib", "center-plot", "pan-plot",
@@ -168,6 +171,22 @@ class GXPS(Gtk.Application):
         self.quit()
         return False
 
+
+def complement_builder(builder):
+    """Do trivial GTK stuff that the builder can not do."""
+    # Save confirmation dialog
+    save_conf_dialog = builder.get_object("save_confirmation_dialog")
+    save_conf_dialog.set_accels()
+    # Plot navigation toolbar
+    navbar = builder.get_object("plot_toolbar")
+    navbar.startup(builder)
+    # RSF dialog
+    rsf_dialog = builder.get_object("rsf_dialog")
+    rsf_entry = builder.get_object("rsf_entry")
+    def apply_rsf(*_args):
+        """Let the dialog send APPLY response."""
+        rsf_dialog.emit("response", Gtk.ResponseType.APPLY)
+    rsf_entry.connect("activate", apply_rsf)
 
 def make_option(long_name, short_name=None, arg=GLib.OptionArg.NONE, **kwargs):
     """Make GLib option for the command line. Uses kwargs description, flags,

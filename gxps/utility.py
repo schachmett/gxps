@@ -177,6 +177,8 @@ class EventBus:
         else:
             if signal not in self._queue or not self._queue[signal]:
                 return
+            if signal not in self._subscribers:
+                return
             LOG.debug("Fire signal '{}' on {}".format(signal, self))
             event_list = EventList(self._queue[signal])
             self._queue[signal].clear()
@@ -208,8 +210,10 @@ class Observable:
     """Provides methods for observing these objects via callbacks.
     """
     _signals = ()
+    _default_signals = ("registered-observable", )
 
     def __init__(self, *args, **kwargs):
+        self._signals = self._signals + self._default_signals
         self._observers = dict((signal, dict()) for signal in self._signals)
         self._queues = []
         super().__init__(*args, **kwargs)
@@ -231,6 +235,8 @@ class Observable:
         """Registers a queue where events are sent to.
         """
         self._queues.append(queue)
+        # TODO breaks older version
+        # self.emit("registered-observable")
         LOG.debug("{} registered to queue {}".format(self, queue))
 
     def unregister_queue(self, queue):

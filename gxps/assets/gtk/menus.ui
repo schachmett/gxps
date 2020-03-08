@@ -6,7 +6,7 @@
 			<section>
 				<item>
 					<attribute name="label">_New</attribute>
-					<attribute name="action">app.new</attribute>
+					<attribute name="action">app.project-new</attribute>
 					<attribute name="accel">&lt;Primary&gt;n</attribute>
 				</item>
 				<item>
@@ -71,25 +71,25 @@
 			<section>
 				<item>
 					<attribute name="label">_Plot selected spectra</attribute>
-					<attribute name="action">win.show-selected-spectra</attribute>
+					<attribute name="action">app.show-selected-spectra</attribute>
 					<attribute name="accel">&lt;Alt&gt;s</attribute>
 				</item>
 				<item>
 					<attribute name="label">_Show orbital energies</attribute>
-					<attribute name="action">win.show-atomlib</attribute>
+					<attribute name="action">app.show-atomlib</attribute>
 					<attribute name="accel">&lt;Alt&gt;o</attribute>
 				</item>
 				<item>
 					<attribute name="label">Background</attribute>
-					<attribute name="action">win.toggle-bg</attribute>
+					<attribute name="action">app.toggle-bg</attribute>
 				</item>
 				<item>
 					<attribute name="label">Region Vertical Lines</attribute>
-					<attribute name="action">win.toggle-region-vlines</attribute>
+					<attribute name="action">app.toggle-region-vlines</attribute>
 				</item>
 				<item>
 					<attribute name="label">Single Peaks</attribute>
-					<attribute name="action">win.toggle-peaks</attribute>
+					<attribute name="action">app.toggle-peaks</attribute>
 				</item>
 			</section>
 		</submenu>
@@ -98,15 +98,15 @@
 			<section>
 				<item>
 					<attribute name="label">View Logfile</attribute>
-					<attribute name="action">win.view-logfile</attribute>
+					<attribute name="action">app.view-logfile</attribute>
 				</item>
 				<item>
 					<attribute name="label">Edit colors</attribute>
-					<attribute name="action">win.edit-colors</attribute>
+					<attribute name="action">app.edit-colors</attribute>
 				</item>
 				<item>
 					<attribute name="label">_About</attribute>
-					<attribute name="action">win.about</attribute>
+					<attribute name="action">app.about</attribute>
 				</item>
 			</section>
 		</submenu>

@@ -78,6 +78,12 @@
             generic-name="gxpscanvas"/>
             
         <glade-widget-class
+            title="GXPS CanvasObjects"
+            name="GXPSCanvasObjects"
+            parent="GtkDrawingArea"
+            generic-name="gxpscanvasobjects"/>
+            
+        <glade-widget-class
             title="MPL Canvas"
             name="MPLCanvas"
             parent="GtkDrawingArea"

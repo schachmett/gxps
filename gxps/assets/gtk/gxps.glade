@@ -201,7 +201,7 @@
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="is_important">True</property>
-                <property name="action_name">win.show-atomlib</property>
+                <property name="action_name">app.show-atomlib</property>
                 <property name="label" translatable="yes">Orbitals Library</property>
                 <property name="use_underline">True</property>
                 <property name="icon_widget">atomlib_button_image</property>
@@ -503,6 +503,16 @@
                       </packing>
                     </child>
                     <child>
+                      <object class="GXPSCanvasObjects" id="canvas_objects">
+                        <property name="can_focus">False</property>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">False</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
                       <object class="GXPSPlotToolbar" id="plot_toolbar">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
@@ -510,7 +520,7 @@
                           <object class="GtkToolButton" id="mpl_center_button">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
-                            <property name="action_name">win.center-plot</property>
+                            <property name="action_name">app.center-plot</property>
                             <property name="label" translatable="yes">Center View</property>
                             <property name="use_underline">True</property>
                             <property name="icon_name">zoom-fit-best-symbolic</property>
@@ -524,7 +534,7 @@
                           <object class="GtkToolButton" id="mpl_pan_button">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
-                            <property name="action_name">win.pan-plot</property>
+                            <property name="action_name">app.pan-plot</property>
                             <property name="label" translatable="yes">Pan</property>
                             <property name="use_underline">True</property>
                             <property name="icon_widget">mpl_pan_button_image1</property>
@@ -538,7 +548,7 @@
                           <object class="GtkToolButton" id="mpl_zoom_button">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
-                            <property name="action_name">win.zoom-plot</property>
+                            <property name="action_name">app.zoom-plot</property>
                             <property name="label" translatable="yes">Zoom</property>
                             <property name="use_underline">True</property>
                             <property name="icon_name">zoom-in-symbolic</property>
@@ -582,21 +592,21 @@
                                   <object class="GtkCheckMenuItem">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
-                                    <property name="action_name">win.toggle-bg</property>
+                                    <property name="action_name">app.toggle-bg</property>
                                   </object>
                                 </child>
                                 <child>
                                   <object class="GtkCheckMenuItem">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
-                                    <property name="action_name">win.toggle-region-vlines</property>
+                                    <property name="action_name">app.toggle-region-vlines</property>
                                   </object>
                                 </child>
                                 <child>
                                   <object class="GtkCheckMenuItem">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
-                                    <property name="action_name">win.toggle-peaks</property>
+                                    <property name="action_name">app.toggle-peaks</property>
                                   </object>
                                 </child>
                               </object>
@@ -631,7 +641,6 @@
                       <object class="GtkBox" id="region_add_box">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="margin_top">5</property>
                         <child>
                           <object class="GtkLabel">
                             <property name="visible">True</property>
@@ -682,20 +691,6 @@
                         <property name="expand">False</property>
                         <property name="fill">True</property>
                         <property name="position">0</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkComboBoxText" id="spectrum_chooser_combo">
-                        <property name="width_request">330</property>
-                        <property name="visible">True</property>
-                        <property name="can_focus">False</property>
-                        <property name="halign">center</property>
-                        <signal name="changed" handler="on_spectrum_chooser_combo_changed" swapped="no"/>
-                      </object>
-                      <packing>
-                        <property name="expand">False</property>
-                        <property name="fill">True</property>
-                        <property name="position">1</property>
                       </packing>
                     </child>
                     <child>
@@ -2621,7 +2616,7 @@ E.g.: "O Si C V Ti"</property>
       <object class="GtkMenuItem">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
-        <property name="action_name">win.show-selected-spectra</property>
+        <property name="action_name">app.show-selected-spectra</property>
         <property name="label" translatable="yes">_Show selected</property>
         <property name="use_underline">True</property>
       </object>
