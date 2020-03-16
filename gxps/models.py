@@ -187,7 +187,6 @@ class PeakModel(Model):
         funcargs = self.make_funcargs(params)
         center = funcargs["center"]
         fwhm = funcargs["fwhm"]
-        print(fwhm)
         hm = self.func(x=center, **funcargs) / 2
         x_min, x_max = center, center
         while self.func(x=x_max, **funcargs) >= hm:

@@ -649,8 +649,28 @@
                           </packing>
                         </child>
                         <child>
+                          <object class="GtkViewport">
+                            <property name="width_request">36</property>
+                            <property name="visible">True</property>
+                            <property name="can_focus">False</property>
+                            <property name="shadow_type">none</property>
+                            <child>
+                              <object class="GtkImage" id="bg_caution_image">
+                                <property name="can_focus">False</property>
+                                <property name="tooltip_text" translatable="yes">Caution: Differing background types.</property>
+                                <property name="icon_name">dialog-warning-symbolic</property>
+                              </object>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">1</property>
+                          </packing>
+                        </child>
+                        <child>
                           <object class="GtkComboBoxText" id="region_background_type_combo">
-                            <property name="width_request">150</property>
+                            <property name="width_request">114</property>
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
                             <property name="active">1</property>
@@ -664,7 +684,7 @@
                           <packing>
                             <property name="expand">False</property>
                             <property name="fill">True</property>
-                            <property name="position">1</property>
+                            <property name="position">2</property>
                           </packing>
                         </child>
                         <child>
@@ -679,7 +699,7 @@
                           <packing>
                             <property name="expand">False</property>
                             <property name="fill">True</property>
-                            <property name="position">2</property>
+                            <property name="position">3</property>
                           </packing>
                         </child>
                         <child>
@@ -694,7 +714,7 @@
                           <packing>
                             <property name="expand">False</property>
                             <property name="fill">True</property>
-                            <property name="position">3</property>
+                            <property name="position">4</property>
                           </packing>
                         </child>
                       </object>
@@ -791,6 +811,7 @@
                     </child>
                     <child>
                       <object class="GtkScrolledWindow">
+                        <property name="width_request">400</property>
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
                         <property name="shadow_type">in</property>
@@ -848,6 +869,7 @@
                                 <property name="sensitive">False</property>
                                 <property name="can_focus">True</property>
                                 <property name="width_chars">8</property>
+                                <property name="xalign">0.5</property>
                               </object>
                               <packing>
                                 <property name="expand">True</property>
@@ -875,6 +897,7 @@
                                 <property name="sensitive">False</property>
                                 <property name="can_focus">True</property>
                                 <property name="width_chars">8</property>
+                                <property name="xalign">0.5</property>
                               </object>
                               <packing>
                                 <property name="expand">True</property>

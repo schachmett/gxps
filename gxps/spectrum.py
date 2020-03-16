@@ -615,7 +615,7 @@ class Peak(Observable):
             if self in self.spectrum.peaks:
                 return name
             return param_key
-        regex = r"\b[A-Za-z][A-Za-z0-9]*_[a-z]+"
+        regex = r"\b[A-Za-z][A-Za-z0-9]*_[a-z_]+"
         relation = re.sub(regex, param_repl, expr)
         return relation
 

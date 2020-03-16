@@ -99,7 +99,7 @@ class File(Operator):
         if not merge:
             self.state.active_spectra = [spectra[idx] for idx in active_idxs]
             self.state.current_project = fname
-        LOG.info("Opened project file {}".format(fname))
+        LOG.info("Opened project file '{}'".format(fname))
 
     def on_open(self, *_args):
         """Let the user choose a project file to open and open it through
@@ -166,6 +166,7 @@ class File(Operator):
         """Saves project file."""
         gxps.io.save_project(fname, self.data, self.state)
         self.state.current_project = fname
+        LOG.info("Saved project to '{}'".format(fname))
 
     def on_save(self, *_args):
         """Saves the current project."""
@@ -237,6 +238,19 @@ class Edit(Operator):
             if spectrum.normalization_type != "manual":
                 raise ValueError("Normalization is not set to manual")
             spectrum.normalization_divisor = 1 / float(entry.get_text())
+
+    def on_change_bg(self, *_args):
+        """Changes the background type."""
+        active_spectra = self.state.active_spectra
+        if len(active_spectra) < 1:
+            return
+        combo = self.get_widget("region_background_type_combo")
+        bgid = combo.get_active_id()
+        if bgid is None:
+            return
+        bg_type = self.state.titles["background_type_ids"].inverse[bgid]
+        for spectrum in active_spectra:
+            spectrum.background_type = bg_type
 
 
 class Fit(Operator):

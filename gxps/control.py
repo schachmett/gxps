@@ -46,7 +46,7 @@ class CommandSender:
             "on_calibration_spinbutton_value_changed": self._edit.on_calibrate,
             "on_normalization_combo_changed": self._edit.on_normalize,
             "on_normalization_entry_activate": self._edit.on_normalize_manual,
-            "on_region_background_type_combo_changed": lambda *x: None,
+            "on_region_background_type_combo_changed": self._edit.on_change_bg,
 
             # Fit actions
             "add-region": self._fit.on_add_region,

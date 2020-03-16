@@ -351,6 +351,9 @@ class SpectraPanel(View):
             if "spectra" not in event.properties["attr"]:
                 return
         active_spectra = self.state.active_spectra
+        # background not really part of this panel, but fits best here
+        bg_combo = self.get_widget("region_background_type_combo")
+        bg_caution = self.get_widget("bg_caution_image")
         cal_spinbutton = self.get_widget("calibration_spinbutton")
         cal_caution = self.get_widget("cal_caution_image")
         norm_combo = self.get_widget("normalization_combo")
@@ -359,10 +362,12 @@ class SpectraPanel(View):
         if not active_spectra:
             norm_combo.set_active(-1)
             norm_caution.set_visible(False)
-            cal_spinbutton.set_value(0.0)
-            cal_caution.set_visible(False)
             norm_entry.set_text("")
             norm_entry.set_sensitive(False)
+            cal_spinbutton.set_value(0.0)
+            cal_caution.set_visible(False)
+            bg_combo.set_active(-1)
+            bg_caution.set_visible(False)
         else:
             norm_types = [s.normalization_type for s in active_spectra]
             if len(set(norm_types)) > 1:
@@ -372,8 +377,6 @@ class SpectraPanel(View):
             else:
                 normid = self.state.titles["norm_type_ids"][norm_types[0]]
                 norm_combo.set_active(int(normid))
-                # this circumvents signal emission instead
-                # of this: norm.set_active_id(normid)
                 norm_caution.set_visible(False)
                 if norm_types[0] == "manual":
                     norm_entry.set_sensitive(True)
@@ -391,6 +394,14 @@ class SpectraPanel(View):
             else:
                 cal_spinbutton.set_value(cals[0])
                 cal_caution.set_visible(False)
+            bg_types = [s.background_type for s in active_spectra]
+            if len(set(bg_types)) > 1:
+                bg_combo.set_active(-1)
+                bg_caution.set_visible(True)
+            else:
+                bgid = self.state.titles["background_type_ids"][bg_types[0]]
+                bg_combo.set_active(int(bgid))
+                bg_caution.set_visible(False)
 
     def _set_selection(self, spectra):
         """Selects rows representing spectra."""
@@ -559,7 +570,7 @@ class PeakPanel(View):
 
     def format_peak_attr(self, peak, attr):
         """Returns a string representing the peak's distinct attribute."""
-        if attr in ("position", "fwhm", "area", "alpha", "beta"):
+        if attr in ("position", "fwhm", "area", "alpha", "beta", "gamma"):
             constraints = peak.get_constraints(attr)
             if constraints["value"] is None:
                 return ""

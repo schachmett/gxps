@@ -45,8 +45,9 @@ class State(Observable):
             "position": "Position",
             "area": "Area*",
             "fwhm": "FWHM*",
-            "alpha": "Alpha",
-            "beta": "Beta"
+            "alpha": "Par1",
+            "beta": "Par2",
+            "gamma": "Par3"
         }),
         "static_specinfo": OrderedBidict({
             "filename": "Filename"
@@ -72,6 +73,16 @@ class State(Observable):
             "low_energy": "3",
             "manual": "4"
         }),
+        "background_types": OrderedBidict({
+            "none": "none",
+            "shirley": "Shirley",
+            "linear": "Linear"
+        }),
+        "background_type_ids": OrderedBidict({
+            "none": "0",
+            "shirley": "1",
+            "linear": "2"
+        }),
         "photon_source_ids": OrderedBidict({
             "Al": "0",
             "Mg": "1"
@@ -93,7 +104,10 @@ class State(Observable):
         self._spectra_tv_columns = ["name", "notes"]
         self._spectra_tv_filter = ["notes", None]
         # Peak Trewwvie-related
-        self._peak_tv_columns = ["name", "label", "position", "fwhm", "area"]
+        self._peak_tv_columns = [
+            "name", "label", "position", "fwhm", "area",
+            "alpha"
+        ]
         # Plotting-related
         self._rsf_elements = [""]
         self._photon_source = "Al"
@@ -282,6 +296,7 @@ class State(Observable):
             self.emit("changed-project", attr="filename")
         else:
             self._project_isaltered = False
+            self.emit("changed-project", attr="filename")
 
     @property
     def project_isaltered(self):
