@@ -43,8 +43,8 @@ class State(Observable):
             "name": "     ",
             "shape": "Shape",
             "position": "Position",
-            "area": "Area",
-            "fwhm": "FWHM",
+            "area": "Area*",
+            "fwhm": "FWHM*",
             "alpha": "Alpha",
             "beta": "Beta"
         }),

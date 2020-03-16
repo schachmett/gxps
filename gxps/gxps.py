@@ -94,17 +94,18 @@ class GXPS(Gtk.Application):
         )
 
         callbacks = [
+            "on_spectrum_view_search_entry_changed",
+            "on_spectrum_view_search_combo_changed",
+            "on_spectrum_view_button_press_event",
+            "on_spectrum_view_row_activated",
             "on_calibration_spinbutton_value_changed",
             "on_normalization_combo_changed",
             "on_normalization_entry_activate",
             "on_region_background_type_combo_changed",
             "on_peak_entry_activate",
             "on_peak_name_entry_changed",
-            "on_spectrum_view_search_entry_changed",
-            "on_spectrum_view_search_combo_changed",
-            "on_spectrum_view_button_press_event",
-            "on_spectrum_view_row_activated",
             "on_peak_view_row_activated",
+            "on_peak_model_combo_changed",
         ]
         actions = [
             "project-new", "save-project", "save-project-as", "open-project",

@@ -8,7 +8,7 @@ import re
 
 import numpy as np
 from lmfit import Parameters
-from lmfit.models import PseudoVoigtModel, ConstantModel
+from lmfit.models import ConstantModel#, PseudoVoigtModel
 
 from gxps.utility import Observable, MetaDataContainer
 from gxps.processing import (
@@ -18,9 +18,13 @@ from gxps.processing import (
     make_equidistant,
     make_increasing,
     calculate_normalization_divisor,
+)
+from gxps.models import(
     pah2fwhm,
     pah2area,
     DoniachSunjicModel,
+    VoigtModel,
+    PseudoVoigtModel
 )
 
 
@@ -374,13 +378,14 @@ class ModeledSpectrum(Spectrum):
 
     def remove_peak(self, peak):
         """Remove a peak specified by its name."""
-        pars_to_del = [
-            par for par in self.params
-            if re.match(r"{}_[a-z]+".format(peak.name), par)
-        ]
+        # pars_to_del = [
+        #     par for par in self.params
+        #     if re.match(r"{}_[a-z]+".format(peak.name), par)
+        # ]
+        peak.clear_params()
         self._peaks.remove(peak)
-        for par in pars_to_del:
-            self.params.pop(par)
+        # for par in pars_to_del:
+        #     self.params.pop(par)
         self.emit("changed-fit", attr="peaks")
 
 
@@ -403,14 +408,20 @@ class Peak(Observable):
     _signals = ("changed-peak", "changed-peak-meta")
     _default_aliases = {
         "alpha": None,
-        "beta": None
+        "beta": None,
+        "gamma": None
+    }
+    _defaults = {
+        "alpha": 0.5,
+        "beta": 0,
+        "gamma": 0
     }
     shapes = ["PseudoVoigt", "DoniachSunjic", "Voigt"]
 
     def __init__(
             self, name, spectrum,
             area=None, fwhm=None, position=None,
-            shape="PseudoVoigt", alpha=0.5, beta=None
+            shape="PseudoVoigt", alpha=None, beta=None, gamma=None
         ):
         # pylint: disable=too-many-arguments
         super().__init__()
@@ -422,16 +433,14 @@ class Peak(Observable):
         if None in (area, fwhm, position):
             raise ValueError("Required attribute(s) missing")
 
-        if self._shape == "PseudoVoigt":
-            self._model = PseudoVoigtModel(prefix="{}_".format(name))
-            self._model.set_param_hint("fraction", vary=False, value=alpha)
-        elif self._shape == "DoniachSunjic":
-            self._model = DoniachSunjicModel(prefix="{}_".format(name))
-            self._model.set_param_hint("gamma", vary=False, value=alpha)
-        else:
-            self._model = (beta, )  # only for linting
-            raise NotImplementedError("Only PseudoVoigt shape supported")
+        self._model = None
+        self.initialize_model(area, fwhm, position, alpha, beta, gamma)
+        LOG.info("Peak '{}' created ({})".format(self.name, self))
 
+    def initialize_model(self, area, fwhm, position, alpha, beta, gamma):
+        """Initialize the peak model and the parameters."""
+        # pylint: disable=too-many-arguments
+        self.clear_params()
         self.param_aliases = {
             "area": "amplitude",
             "fwhm": "fwhm",
@@ -439,17 +448,33 @@ class Peak(Observable):
         }
         if self._shape == "PseudoVoigt":
             self.param_aliases["alpha"] = "fraction"
-        if self._shape == "DoniachSunjic":
-            self.param_aliases["alpha"] = "gamma"
+            if alpha is None:
+                alpha = 0.5
+            self._model = PseudoVoigtModel(prefix="{}_".format(self.name))
+            self._model.set_param_hint("fraction", vary=False, value=alpha)
+        elif self._shape == "DoniachSunjic":
+            self.param_aliases["alpha"] = "asym"
+            if alpha is None:
+                alpha = 0.1
+            self._model = DoniachSunjicModel(prefix="{}_".format(self.name))
+            self._model.set_param_hint("asym", vary=False, value=alpha)
+        elif self._shape == "Voigt":
+            self.param_aliases["alpha"] = "fwhm_l"
+            if alpha is None:
+                alpha = 0.5
+            self._model = VoigtModel(prefix="{}_".format(self.name))
+            self._model.set_param_hint("fwhm_l", vary=False, value=alpha)
+        else:
+            if "" in (beta, gamma, ):
+                pass #only for linter
+            raise NotImplementedError("Unkown shape '{}'".format(self._shape))
 
         self.params += self._model.make_params()
-        self.get_param("fwhm").set(value=abs(fwhm), vary=True, min=0)
+        self.get_param("fwhm").set(value=abs(fwhm), min=0, vary=True)
         self.get_param("amplitude").set(value=abs(area), min=0)
         self.get_param("center").set(value=abs(position), min=0)
-        if self._shape == "PseudoVoigt":
-            self.get_param("sigma").set(expr="{}_fwhm/2".format(name))
-
-        LOG.info("Peak '{}' created ({})".format(self.name, self))
+        # if self._shape == "PseudoVoigt":
+        #     self.get_param("sigma").set(expr="{}_fwhm/2".format(self.name))
 
     def get_param_by_real_name(self, param_name):
         """Shortcut for getting the Parameter object called
@@ -469,6 +494,15 @@ class Peak(Observable):
                 "".format(self, self.shape, param_alias)
             )
         return self.params["{}_{}".format(self.name, param_name)]
+
+    def clear_params(self):
+        """Clear this peaks' parameters from the model."""
+        pars_to_del = [
+            par for par in self.params
+            if re.match(r"{}_[a-z]+".format(self.name), par)
+        ]
+        for par in pars_to_del:
+            self.params.pop(par)
 
     @property
     def model(self):
@@ -547,11 +581,17 @@ class Peak(Observable):
 
     def get_constraints(self, param_alias):
         """Returns a string containing min/max or expr."""
-        # param_name = self.param_aliases[param_alias]
         try:
             param = self.get_param(param_alias)
         except ValueError:
-            return None
+            constraints = {
+                "value": None,
+                "min": -np.inf,
+                "max": np.inf,
+                "vary": None,
+                "expr": ""
+            }
+            return constraints
 
         relation = ""
         if param.expr is not None:
@@ -606,79 +646,51 @@ class Peak(Observable):
     @shape.setter
     def shape(self, value):
         """Sets the peak shape."""
-        if value == "PseudoVoigt":
-            self._shape = value     #TODO!
+        if self._shape == value:
+            return
+        fwhm = self.get_constraints("fwhm")
+        area = self.get_constraints("area")
+        position = self.get_constraints("position")
+        alpha = self.get_constraints("alpha")
+        beta = self.get_constraints("beta")
+        gamma = self.get_constraints("gamma")
+        # only change shape after getting constraints!
+        if value in ("PseudoVoigt", "DoniachSunjic", "Voigt"):
+            self._shape = value
         else:
             raise NotImplementedError
 
-    @property
-    def area(self):
-        """Returns area value."""
-        return self.params["{}_amplitude".format(self.name)].value
-
-    @area.setter
-    def area(self, value):
-        """Set area value."""
-        param = self.params["{}_amplitude".format(self.name)]
-        param.set(value=value)
+        self.initialize_model(
+            area["value"], fwhm["value"], position["value"],
+            alpha["value"], beta["value"], gamma["value"]
+        )
         self.emit("changed-peak")
 
-    @property
-    def fwhm(self):
-        """Returns fwhm value."""
-        return self.params["{}_fwhm".format(self.name)].value
+    def get_area(self):
+        """Returns measured area under the peak."""
+        return self._model.get_area(self.params)
 
-    @fwhm.setter
-    def fwhm(self, value):
-        """Sets peak width."""
-        param = self.params["{}_fwhm".format(self.name)]
-        param.set(value=value)
-        self.emit("changed-peak")
-
-    @property
-    def position(self):
-        """Returns position value."""
-        return self.params["{}_center".format(self.name)].value
-
-    @position.setter
-    def position(self, value):
-        """Sets peak position."""
-        param = self.params["{}_center".format(self.name)]
-        param.set(value=value)
-        self.emit("changed-peak")
+    def get_fwhm(self):
+        """Returns measured fwhm of the peak."""
+        return self._model.get_fwhm(self.params)
 
     @property
     def alpha_name(self):
         """Gives the name of the parameter alpha."""
         if self.shape == "PseudoVoigt":
-            return "Alpha"
+            return "Fraction"
         if self.shape == "DoniachSunjic":
-            return "Gamma"
+            return "Asym"
+        if self.shape == "Voigt":
+            return "Lor. FWHM"
         return None
-
-    @property
-    def alpha(self):
-        """Returns model specific value 1."""
-        if self._shape == "PseudoVoigt":
-            return self.params["{}_fraction".format(self.name)].value
-        return None
-
-    @alpha.setter
-    def alpha(self, value):
-        """Sets model specific value 1."""
-        if self._shape == "PseudoVoigt":
-            param = self.params["{}_fraction".format(self.name)]
-            param.set(value=value)
-        else:
-            raise AttributeError("Shape {} has no alpha".format(self._shape))
-        self.emit("changed-peak")
 
     @property
     def beta_name(self):
-        """Gives the name of the parameter alpha."""
+        """Gives the name of the parameter beta."""
         return None
 
     @property
-    def beta(self):
-        """Returns model specific value 2."""
+    def gamma_name(self):
+        """Gives the name of the parameter gamma."""
         return None

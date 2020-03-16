@@ -460,6 +460,15 @@ class PeakPanel(View):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        shape_combo = self.get_widget("new_peak_model_combo")
+        shape_combo.remove_all()
+        model_combo = self.get_widget("peak_model_combo")
+        model_combo.remove_all()
+        for shape in Peak.shapes:
+            shape_combo.append_text(shape)
+            model_combo.append_text(shape)
+        shape_combo.set_active(0)
         self._make_columns()
 
     def update_data(self, _event):
@@ -482,6 +491,7 @@ class PeakPanel(View):
 
     def update_controls(self, event):
         """Updates the entries representing peak parameters."""
+        # pylint: disable=too-many-branches
         active_peaks = self.state.active_peaks
         if event.signal in ("changed-peak", "changed-peak-meta"):
             if not set(event.source) & set(active_peaks):
@@ -489,56 +499,69 @@ class PeakPanel(View):
         if event.signal == "changed-fit":
             if not set(event.source) & set(self.state.active_spectra):
                 return
-        label_entry = self.get_widget("peak_name_entry")
-        position_entry = self.get_widget("peak_position_entry")
-        area_entry = self.get_widget("peak_area_entry")
-        fwhm_entry = self.get_widget("peak_fwhm_entry")
+
         model_combo = self.get_widget("peak_model_combo")
-        alpha_label = self.get_widget("peak_alpha_label")
-        alpha_entry = self.get_widget("peak_alpha_entry")
+        entries = {
+            "label": self.get_widget("peak_name_entry"),
+            "position": self.get_widget("peak_position_entry"),
+            "area": self.get_widget("peak_area_entry"),
+            "fwhm": self.get_widget("peak_fwhm_entry"),
+            "alpha": self.get_widget("peak_alpha_entry"),
+            "beta": self.get_widget("peak_beta_entry"),
+            "gamma": self.get_widget("peak_gamma_entry"),
+            "real_area": self.get_widget("peak_realarea_entry"),
+            "real_fwhm": self.get_widget("peak_realfwhm_entry")
+        }
+        labels = {
+            "alpha": self.get_widget("peak_alpha_label"),
+            "beta": self.get_widget("peak_beta_label"),
+            "gamma": self.get_widget("peak_gamma_label")
+        }
 
         if len(active_peaks) != 1:
-            label_entry.set_text("")
-            label_entry.set_sensitive(False)
-            position_entry.set_text("")
-            position_entry.set_sensitive(False)
-            area_entry.set_text("")
-            area_entry.set_sensitive(False)
-            fwhm_entry.set_text("")
-            fwhm_entry.set_sensitive(False)
-            model_combo.set_active_id(None)
+            model_combo.set_active(-1)
             model_combo.set_sensitive(False)
-            alpha_label.set_text("alpha")
-            alpha_entry.set_text("")
-            alpha_entry.set_sensitive(False)
+            for entry in entries.values():
+                entry.set_text("")
+                entry.set_sensitive(False)
+            for label in labels.values():
+                label.set_text("")
             return
 
         peak = active_peaks[0]
+        names = {
+            "alpha": peak.alpha_name,
+            "beta": peak.beta_name,
+            "gamma": peak.gamma_name
+        }
 
-        label_entry.set_text(peak.label)
-        label_entry.set_sensitive(True)
-        position_entry.set_text(self.format_peak_constraints(peak, "position"))
-        position_entry.set_sensitive(True)
-        area_entry.set_text(self.format_peak_constraints(peak, "area"))
-        area_entry.set_sensitive(True)
-        fwhm_entry.set_text(self.format_peak_constraints(peak, "fwhm"))
-        fwhm_entry.set_sensitive(True)
+        entries["real_area"].set_text("{:.2f}".format(peak.get_area()))
+        entries["real_fwhm"].set_text("{:.2f}".format(peak.get_fwhm()))
+        entries["label"].set_sensitive(True)
+        entries["label"].set_text(peak.label)
+        for par in ("position", "area", "fwhm"):
+            entries[par].set_sensitive(True)
+            entries[par].set_text(self.format_peak_constraints(peak, par))
+        for par in ("alpha", "beta", "gamma"):
+            if names[par]:
+                entries[par].set_sensitive(True)
+                entries[par].set_text(self.format_peak_constraints(peak, par))
+                labels[par].set_text(names[par])
+            else:
+                entries[par].set_sensitive(False)
+                labels[par].set_text("")
 
-        model_combo.remove_all()
         for i, shape in enumerate(Peak.shapes):
-            model_combo.append_text(shape)
             if shape == peak.shape:
                 model_combo.set_active(i)
         model_combo.set_sensitive(True)
-        alpha_label.set_text(peak.alpha_name)
-        alpha_entry.set_text(self.format_peak_constraints(peak, "alpha"))
-        alpha_entry.set_sensitive(True)
+
 
     def format_peak_attr(self, peak, attr):
         """Returns a string representing the peak's distinct attribute."""
         if attr in ("position", "fwhm", "area", "alpha", "beta"):
             constraints = peak.get_constraints(attr)
-            if constraints is None:
+            if constraints["value"] is None:
                 return ""
             cstring = ""
             if constraints["expr"]:
@@ -569,6 +592,8 @@ class PeakPanel(View):
         """Returns a string representing the peak's attribute's constraints.
         """
         constraints = peak.get_constraints(attr)
+        if constraints["value"] is None:
+            return ""
         cstring = ""
         if constraints["expr"]:
             cstring += str(constraints["expr"])

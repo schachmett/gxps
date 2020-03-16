@@ -285,13 +285,13 @@ class Fit(Operator):
 
     def on_add_peak(self, *_args):
         """Add peak to active regions."""
+        shape_combo = self.get_widget("new_peak_model_combo")
+        shape = shape_combo.get_active_text()
         def add_peak(position, height, angle):
             """Create new peak from drawn parameters."""
             for spectrum in self.state.active_spectra:
                 height -= spectrum.background_of_E(position)
                 name = self.state.next_peak_name
-                shape = "DoniachSunjic"
-                # shape = "PseudoVoigt"
                 peak = spectrum.add_peak(name, position=position, angle=angle,
                                          height=height, shape=shape)
                 peak.register_queue(self.bus)
@@ -335,6 +335,16 @@ class Fit(Operator):
             peak.set_constraint(**constraint)
         model_combo = self.get_widget("peak_model_combo")
         peak.shape = peak.shapes[model_combo.get_active()]
+
+    def on_peak_model_changed(self, *_args):
+        """Change the model of the active peak."""
+        active_peaks = self.state.active_peaks
+        if len(active_peaks) != 1:
+            return
+        peak = active_peaks[0]
+        model_combo = self.get_widget("peak_model_combo")
+        shape = model_combo.get_active_text()
+        peak.shape = shape
 
     def on_peak_name_entry_changed(self, *_args):
         """Change the active peak's name."""

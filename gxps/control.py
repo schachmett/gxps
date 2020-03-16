@@ -60,6 +60,7 @@ class CommandSender:
             # Fit handlers
             "on_peak_entry_activate": self._fit.on_peak_entry_activate,
             "on_peak_name_entry_changed": self._fit.on_peak_name_entry_changed,
+            "on_peak_model_combo_changed": self._fit.on_peak_model_changed,
 
             # View actions
             "show-selected-spectra": self._view.on_show_selected_spectra,

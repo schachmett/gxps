@@ -5,15 +5,9 @@
 import logging
 
 import numpy as np
-from lmfit.model import Model
-from lmfit.models import guess_from_peak, update_param_vals
 
 
 LOG = logging.getLogger(__name__)
-
-s2 = np.sqrt(2)
-ln2 = 1 * np.log(2)
-sqrtln2 = np.sqrt(ln2)
 
 
 class IgnoreUnderflow:
@@ -27,43 +21,6 @@ class IgnoreUnderflow:
 
     def __exit__(self, exc_type, exc_value, traceback):
         np.seterr(**self.old_settings)
-
-
-class DoniachSunjicModel(Model):
-    """x-axis reversed Doniach model (general formula taken from lmfit)."""
-    # pylint: disable=dangerous-default-value
-    # pylint: disable=arguments-differ
-    # pylint: disable=abstract-method
-    def __init__(self, **kwargs):
-        kwargs["independent_vars"] = kwargs.get("independent_vars", ["x"])
-        kwargs["prefix"] = kwargs.get("prefix", "")
-        kwargs["nan_policy"] = kwargs.get("nan_policy", "raise")
-
-        def realdoniach(x, amplitude=1.0, center=0, fwhm=1.0, gamma=0.0):
-            """Lineshape for a x-axis reversed doniach."""
-            sigma = fwhm / 2
-            arg = (x-center)/sigma
-            arg = -arg          # this is the reversal
-            gm1 = (1.0 - gamma)
-            scale = amplitude/(sigma**gm1)
-            ds = (
-                scale
-                * np.cos(np.pi * gamma / 2 + gm1 * np.arctan(arg))
-                / (1 + arg ** 2) ** (gm1 / 2)
-            )
-            return ds
-        super().__init__(realdoniach, **kwargs)
-        self._set_paramhints_prefix()
-
-    def _set_paramhints_prefix(self):
-        fmt = ("{prefix:s}amplitude/({prefix:s}fwhm/2**(1-{prefix:s}gamma))"
-               "*cos(pi*{prefix:s}gamma/2)")
-        self.set_param_hint('height', expr=fmt.format(prefix=self.prefix))
-
-    def guess(self, data, x=None, negative=False, **kwargs):
-        """Guess the pars."""
-        pars = guess_from_peak(self, data, x, negative, ampscale=0.5)
-        return update_param_vals(pars, self.prefix, **kwargs)
 
 
 def calculate_background(bg_type, bg_bounds, energy, intensity):
@@ -175,34 +132,6 @@ def calculate_normalization_divisor(norm_type, norm_div, _energy, intensity):
     else:
         ValueError("Invalid normalization type '{}'".format(norm_type))
     return new_divisor
-
-def pah2fwhm(_position, angle, height, shape):
-    """Calculates fwhm from position, angle, height depending on shape."""
-    if shape == "PseudoVoigt":
-        return np.tan(angle) * height
-    elif shape == "DoniachSunjic":
-        return np.tan(angle) * height #TODO experimental
-    raise NotImplementedError
-
-def pah2area(_position, angle, height, shape):
-    """Calculates area from position, angle, height depending on shape."""
-    if shape == "PseudoVoigt":
-        fwhm = np.tan(angle) * height
-        area = (
-            height
-            * (fwhm * np.sqrt(np.pi / ln2))
-            / (1 + np.sqrt(1 / (np.pi * ln2)))
-        )
-        return area
-    elif shape == "DoniachSunjic":
-        fwhm = np.tan(angle) * height
-        area = (
-            height
-            * (fwhm * np.sqrt(np.pi / ln2))
-            / (1 + np.sqrt(1 / (np.pi * ln2)))
-        )
-        return area #TODO experimental
-    raise NotImplementedError
 
 def is_equidistant(energy, tol=1e-08):
     """Returns True only when energy is equidistant."""
