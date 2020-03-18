@@ -451,6 +451,9 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
         called during NavigationToolbar.__init__
         """
 
+    def set_history_buttons(self):
+        """Same as above, this prevents the use of self._gtk_ids."""
+
     def disable_tools(self):
         """Release widgetlock and disconnect all signals associated with
         native matplotlib toolbar tools.

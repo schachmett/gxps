@@ -29,6 +29,7 @@ LOG = logging.getLogger(__name__)
 # fine tune bus priority and event checking
 # make detailed signals instead of putting everything in event properties
 # make emitting signals a decorator?
+# replace buttons for peak adding etc with Gtk.ToggleButton
 
 
 class GXPS(Gtk.Application):

@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=XPL
 GenericName=XPS Spectrum Analysis
-Exec=python3 -m xpl
+Exec=gxps
 Terminal=false
 Type=Application
 Icon=xpl.svg

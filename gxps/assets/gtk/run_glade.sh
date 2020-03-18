@@ -13,4 +13,4 @@ XDG_DATA_DIRS="${dir}:${XDG_DATA_DIRS}"
 
 export GLADE_CATALOG_SEARCH_PATH
 export XDG_DATA_DIRS
-exec glade "$@"
+exec glade "${dir}/gxps.glade"

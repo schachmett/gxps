@@ -11,7 +11,7 @@ with open("README.md", "r") as rmf:
     long_description = rmf.read()
 
 setup(
-    name="xpl",
+    name="gxps",
     version=__version__,
     author="Simon Fischer",
     description="XPS spectrum analysis",
@@ -33,9 +33,12 @@ setup(
         "cairocffi",
         "lmfit"
     ],
+    entry_points={
+        "gui_scripts": ["gxps = gxps.main:main"]
+    },
     python_requires="~=3.5",
     package_data={
-        "xpl": [
+        "gxps": [
             "assets/gtk/menus.ui",
             "assets/gtk/gxps.glade",
             "assets/gtk/gxps_catalog.xml",
