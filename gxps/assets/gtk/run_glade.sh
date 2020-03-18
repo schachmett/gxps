@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Runs the Glade UI designer with gxps catalog from this directory
 # Taken from https://github.com/mypaint/mypaint/blob/master/glade/run.sh
 
@@ -13,4 +13,4 @@ XDG_DATA_DIRS="${dir}:${XDG_DATA_DIRS}"
 
 export GLADE_CATALOG_SEARCH_PATH
 export XDG_DATA_DIRS
-exec glade "$@"
+exec glade "${dir}/gxps.glade"
