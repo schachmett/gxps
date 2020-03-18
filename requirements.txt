@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+asteval==0.9.13
+>>>>>>> 200a468f10a19c6eb4e7634ec97d8dbf416200b0
 bidict==0.18.0
 cairocffi==1.0.0
 lmfit==0.9.12
