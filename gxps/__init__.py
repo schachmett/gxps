@@ -1,11 +1,14 @@
 """Loads the configuration ini and sets app name and version."""
 # pylint: disable=invalid-name
+# pylint: disable=wrong-import-order
 # pylint: disable=logging-format-interpolation
 
 __appname__ = "GXPS"
-__version__ = "alpha"
 __authors__ = ["Simon Fischer <sf@simon-fischer.info>"]
 __website__ = "https://github.com/schachmett/gxps"
+
+from pbr.version import VersionInfo
+__version__ = VersionInfo("gxps").version_string()
 
 
 import os

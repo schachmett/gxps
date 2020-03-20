@@ -1,0 +1,22 @@
+CHANGES
+=======
+
+v0.8.0
+------
+
+* added launcher script
+* can now be started via "$ gxps" from console
+* can now be started via "$ gxps" from console
+* implemented changing background type
+* implemented (more) lineshapes
+* rehauled view and began implementing more peak models
+* controller finally rehauled, CommandSender now does heavy lifting
+* Shuffled around a lot at the Controller class, not yet figured out
+* Completely rehauled observer pattern to now include an event bus
+* Implement peak panel and event queueing system
+* Refinement of logging and event system, changed python filenames
+* data model fully implemented
+* more structuring and implementations
+* implemented background subtraction
+* rudimentary structure, first tests
+* initial commit

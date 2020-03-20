@@ -18,34 +18,21 @@ function main {
     pacman --noconfirm -S --needed \
         git \
         base-devel \
-#        mingw-w64-$MSYS2_ARCH-gettext \
-#        mingw-w64-$MSYS2_ARCH-gdk-pixbuf2 \
-#        mingw-w64-$MSYS2_ARCH-librsvg \
-        mingw-w64-$MSYS2_ARCH-gtk3 \
-#        mingw-w64-$MSYS2_ARCH-libsoup \
-#        mingw-w64-$MSYS2_ARCH-gstreamer \
-#        mingw-w64-$MSYS2_ARCH-gst-plugins-base \
-#        mingw-w64-$MSYS2_ARCH-gst-plugins-good \
-#        mingw-w64-$MSYS2_ARCH-libsrtp \
-#        mingw-w64-$MSYS2_ARCH-gst-plugins-bad \
-#        mingw-w64-$MSYS2_ARCH-gst-libav \
-#        mingw-w64-$MSYS2_ARCH-gst-plugins-ugly \
-#        mingw-w64-$MSYS2_ARCH-toolchain
+        mingw-w64-$MSYS2_ARCH-gtk3
 
     pacman --noconfirm -S --needed \
         mingw-w64-$MSYS2_ARCH-python3 \
+        mingw-w64-$MSYS2_ARCH-python3-numpy \
+        mingw-w64-$MSYS2_ARCH-python3-matplotlib \
+        mingw-w64-$MSYS2_ARCH-python3-scipy \
+        mingw-w64-$MSYS2_ARCH-python3-more-itertools \
         mingw-w64-$MSYS2_ARCH-python3-gobject \
         mingw-w64-$MSYS2_ARCH-python3-cairo \
         mingw-w64-$MSYS2_ARCH-python3-pip \
         mingw-w64-$MSYS2_ARCH-python3-pytest \
-#        mingw-w64-$MSYS2_ARCH-python3-certifi \
-#        mingw-w64-$MSYS2_ARCH-python3-coverage \
-#        mingw-w64-$MSYS2_ARCH-python3-pycodestyle \
-#        mingw-w64-$MSYS2_ARCH-python3-pyflakes
+        mingw-w64-$MSYS2_ARCH-python3-cairo
 
-    pip3 install --user -U bidict cairocffi lmfit \
-        matplotlib numpy more-itertools pycairo \
-        scipy
+    /mingw64/bin/python3.8 -m pip install --user -U bidict cairocffi lmfit
 }
 
 main;

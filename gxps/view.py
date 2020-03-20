@@ -347,6 +347,9 @@ class SpectraPanel(View):
         for example the updating of the value representation should not
         update the value itself again.
         """
+        # pylint: disable=too-many-locals
+        # pylint: disable=too-many-branches
+        # pylint: disable=too-many-statements
         if event.signal == "changed-active":
             if "spectra" not in event.properties["attr"]:
                 return

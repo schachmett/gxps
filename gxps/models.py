@@ -218,7 +218,7 @@ class PeakModel(Model):
             end = center + self.area_range / 2
             N = self.area_range / self.area_res
             res = self.area_res
-        x = np.linspace(start, end, N)
+        x = np.linspace(start, end, int(N))
         y = self.func(x=x, **funcargs)
         return sum(y) * res
 
