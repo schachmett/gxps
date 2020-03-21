@@ -1,6 +1,8 @@
 CHANGES
 =======
 
+* switched to pbr for packaging
+
 v0.8.0
 ------
 

@@ -151,9 +151,10 @@ class GXPS(Gtk.Application):
         if options.contains("version"):
             print("{} version: {}".format(__appname__, __version__))
             self.quit()
+            return 0
         if options.contains("clean"):
             CONFIG["IO"]["current-project"] = ""
-        self.activate()
+        self.do_activate()
         return 0
 
     def on_quit(self, *_args):
