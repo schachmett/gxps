@@ -11,7 +11,7 @@ except ImportError:
     print("-" * 79)
     raise
 
-from gxps.gxps import GXPS
+from gxps.gui import GXPS
 
 
 def main():

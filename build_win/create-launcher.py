@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # This windows building routine was largely adopted from the
-# Quod Libet project 
+# Quod Libet project
 # https://github.com/quodlibet/quodlibet (Copyright 2016 Christoph Reiter)
 
 """Creates simple Python .exe launchers for gui and cli apps
@@ -27,7 +27,7 @@ def build_resource(rc_path, out_path):
     subprocess.check_call(
         ["windres", "-O", "coff", "-F",
          "pe-x86-64" if is_64bit() else "pe-i386", rc_path,
-        "-o", out_path])
+         "-o", out_path])
 
 
 def get_build_args():

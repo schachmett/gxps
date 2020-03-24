@@ -3,8 +3,12 @@
 # Quod Libet project 
 # https://github.com/quodlibet/quodlibet (Copyright 2016 Christoph Reiter)
 
-DIR="$( cd $( dirname $0 ) && pwd )"
-source "$DIR"/_base.sh
+set -e
+
+BASEDIR="$( cd $( dirname $0 ) && pwd )"
+DESTDIR="${BASEDIR}"/_inst
+DISTDIR="${BASEDIR}"/gxps_win
+source "${BASEDIR}"/_base.sh
 
 function main {
     local GIT_TAG=${1:-"master"}
@@ -18,11 +22,13 @@ function main {
     fi
 
     install_pre_deps
-#    create_root
-#    install_deps
+    create_root
+    install_deps
 #    cleanup_before
-#    install_quodlibet "$GIT_TAG"
+    install_gxps "${GIT_TAG}"
+    cp gxps.ico "${BUILD_ROOT}"
 #    cleanup_after
+    make_exe "${DISTDIR}"
 #    build_installer
 #    build_portable_installer
 }

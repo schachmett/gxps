@@ -27,11 +27,11 @@ function main {
         mingw-w64-$MSYS2_ARCH-python3-matplotlib \
         mingw-w64-$MSYS2_ARCH-python3-scipy \
         mingw-w64-$MSYS2_ARCH-python3-more-itertools \
+        mingw-w64-$MSYS2_ARCH-python3-pbr \
         mingw-w64-$MSYS2_ARCH-python3-pytest 
 
     /mingw64/bin/python3.8 -m pip install --user -U \
         bidict \
-        cairocffi \
         lmfit
 }
 
