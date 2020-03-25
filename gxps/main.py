@@ -6,11 +6,13 @@ def main():
     # Test for some cli options immediately
     import sys
     if "--version" in sys.argv:
+        __version__ = "unknown"
         try:
             from pbr.version import VersionInfo
             __version__ = VersionInfo("gxps").release_string()
         except ImportError:
             __version__ = "devel"
+        print(__version__)
         sys.exit(0)
 
 
