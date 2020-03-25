@@ -10,7 +10,7 @@ import string
 
 from bidict import OrderedBidict
 
-from gxps import CONFIG
+from gxps.config import CONFIG
 from gxps.utility import Observable #, EventQueue
 
 

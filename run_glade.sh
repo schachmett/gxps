@@ -2,7 +2,7 @@
 # Runs the Glade UI designer with gxps catalog from this directory
 # Taken from https://github.com/mypaint/mypaint/blob/master/glade/run.sh
 
-dir="$(dirname $0)"
+dir="$(dirname $0)"/data/ui
 GLADE_CATALOG_SEARCH_PATH="$dir"
 echo $GLADE_CATALOG_SEARCH_PATH
 

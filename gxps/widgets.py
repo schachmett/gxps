@@ -12,10 +12,8 @@ from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg
 from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3
 from matplotlib.figure import Figure
 
-from gxps import (
-    COLORS, CONFIG,
-    __appname__, __version__, __authors__, __website__
-    )
+from gxps import __appname__, __version__, __authors__, __website__
+from gxps.config import COLORS, CONFIG
 from gxps.state import State
 from gxps.canvas_tools import (
     PeakSelector, SpanSelector, PointSelector,

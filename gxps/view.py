@@ -11,7 +11,8 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Pango, GLib
 
-from gxps import __appname__, COLORS
+from gxps import __appname__
+from gxps.config import COLORS
 from gxps.io import get_element_rsfs
 from gxps.spectrum import Peak
 

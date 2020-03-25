@@ -9,10 +9,12 @@ afile = os.path.join(package_dir, "main.py")
 
 block_cipher = None
 
-hiddenimports = collect_submodules('gxps')
+hiddenimports = collect_submodules("packaging") + \
+                collect_submodules("pkg_resources.py2_warn") + \
+                collect_submodules("gxps")
 
 datas =[
-  (os.path.join(package_dir, "gxps/assets"), 'assets')
+  (os.path.join(package_dir, "assets"), 'gxps/assets')
 ]
 
 

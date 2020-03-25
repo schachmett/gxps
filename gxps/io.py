@@ -10,7 +10,8 @@ import copy
 
 import numpy as np
 
-from gxps import ASSETDIR, __version__
+from gxps import __version__
+from gxps.xdg import DATA_DIR
 
 
 LOG = logging.getLogger(__name__)
@@ -140,7 +141,7 @@ def get_element_rsfs(element, source):
     photon_energy = source_photons.get(source, None)
     if photon_energy is None:
         photon_energy = float(source)
-    dbfname = str(ASSETDIR / "rsf.db")
+    dbfname = str(DATA_DIR / "assets/rsf.db")
     with sqlite3.connect(dbfname) as database:
         cursor = database.cursor()
         sql = """

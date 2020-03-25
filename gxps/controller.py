@@ -13,10 +13,9 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk
 
-from gxps import (
-    CONFIG, COLORS, LOG_PATH, COLOR_CFG_PATH,
-    __version__, __authors__, __website__, __appname__
-    )
+from gxps import __version__, __authors__, __website__, __appname__
+from gxps.config import CONFIG, COLORS
+from gxps.xdg import LOG_FILE, CONF_DIR
 import gxps.io
 
 
@@ -40,7 +39,7 @@ class Help(Operator):
     def on_view_logfile(_action, *_args):
         """Views logfile in external text editor."""
         if sys.platform.startswith("linux"):
-            os.system("xdg-open {}".format(str(LOG_PATH)))
+            os.system("xdg-open {}".format(str(LOG_FILE)))
         else:
             LOG.warning("logfile viewing only implemented for linux")
 
@@ -48,7 +47,7 @@ class Help(Operator):
     def on_edit_colors(_action, *_args):
         """Views colors.ini file in external text editor."""
         if sys.platform.startswith("linux"):
-            os.system("xdg-open {}".format(str(COLOR_CFG_PATH)))
+            os.system("xdg-open {}".format(str(CONF_DIR / "colors.ini")))
         else:
             LOG.warning("color file editing only implemented for linux")
 

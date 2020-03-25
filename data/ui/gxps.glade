@@ -6,7 +6,7 @@
   <object class="GtkImage" id="add_region_image">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <property name="pixbuf">../icons/hicolor/24x24/addregion.png</property>
+    <property name="pixbuf">../assets/icons/hicolor/24x24/addregion.png</property>
   </object>
   <object class="GtkFileFilter" id="all_imports_filter">
     <patterns>
@@ -18,7 +18,7 @@
   <object class="GtkImage" id="atomlib_button_image">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <property name="pixbuf">../icons/hicolor/24x24/atom_lib.png</property>
+    <property name="pixbuf">../assets/icons/hicolor/24x24/atom_lib.png</property>
   </object>
   <object class="GtkAdjustment" id="calibration_spinbutton_adjustment">
     <property name="lower">-1000</property>
@@ -29,12 +29,12 @@
   <object class="GtkImage" id="image_add_peak">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <property name="pixbuf">../icons/hicolor/24x24/addpeak.png</property>
+    <property name="pixbuf">../assets/icons/hicolor/24x24/addpeak.png</property>
   </object>
   <object class="GtkImage" id="mpl_pan_button_image1">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <property name="pixbuf">../icons/hicolor/24x24/pan.png</property>
+    <property name="pixbuf">../assets/icons/hicolor/24x24/pan.png</property>
   </object>
   <object class="GXPSPeakTreeStore" id="peak_treestore"/>
   <object class="GtkTreeModelFilter" id="peak_filter_treestore">
@@ -46,12 +46,12 @@
   <object class="GtkImage" id="remove_peak_image">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <property name="pixbuf">../icons/hicolor/24x24/removepeak.png</property>
+    <property name="pixbuf">../assets/icons/hicolor/24x24/removepeak.png</property>
   </object>
   <object class="GtkImage" id="remove_region_image">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <property name="pixbuf">../icons/hicolor/24x24/removeregion.png</property>
+    <property name="pixbuf">../assets/icons/hicolor/24x24/removeregion.png</property>
   </object>
   <object class="GXPSSpectrumTreeStore" id="spectrum_treestore"/>
   <object class="GtkTreeModelFilter" id="spectrum_filter_treestore">
@@ -62,7 +62,7 @@
   </object>
   <object class="GXPSAppWindow" id="main_window">
     <property name="can_focus">False</property>
-    <property name="icon">../icons/hicolor/scalable/gxps.svg</property>
+    <property name="icon">../assets/icons/hicolor/scalable/gxps.svg</property>
     <signal name="delete-event" handler="on_main_window_delete_event" swapped="no"/>
     <child type="titlebar">
       <placeholder/>
@@ -1287,7 +1287,7 @@
     <property name="destroy_with_parent">True</property>
     <property name="type_hint">dialog</property>
     <property name="transient_for">main_window</property>
-    <property name="logo">../icons/hicolor/48x48/gxps.png</property>
+    <property name="logo">../assets/icons/hicolor/48x48/gxps.png</property>
     <child>
       <placeholder/>
     </child>

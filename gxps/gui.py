@@ -8,7 +8,9 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gio, GLib
 
-from gxps import __appname__, __version__, ASSETDIR, CONFIG, COLORS
+from gxps import __appname__, __version__
+from gxps.xdg import DATA_DIR
+from gxps.config import CONFIG, COLORS
 from gxps.utility import EventBus
 from gxps.spectrum import SpectrumContainer
 from gxps.state import State
@@ -44,11 +46,11 @@ class GXPS(Gtk.Application):
             flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE
         )
         GLib.set_application_name(__appname__)
-        self.set_resource_base_path(str(ASSETDIR))
+        self.set_resource_base_path(str(DATA_DIR / "assets"))
 
         self.builder = Gtk.Builder.new()
-        self.builder.add_from_file(str(ASSETDIR / "gtk/gxps.glade"))
-        self.builder.add_from_file(str(ASSETDIR / "gtk/menus.ui"))
+        self.builder.add_from_file(str(DATA_DIR / "ui/gxps.glade"))
+        self.builder.add_from_file(str(DATA_DIR / "ui/menus.ui"))
         self.get_widget = self.builder.get_object
 
         self.win = None

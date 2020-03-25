@@ -98,6 +98,7 @@ function install_deps {
         mingw-w64-"${ARCH}"-python3-pbr \
         mingw-w64-"${ARCH}"-python3-pytest 
 
+# setuptools: https://github.com/pypa/setuptools/issues/1963
     PIP_REQUIREMENTS="\
 setuptools<45.0.0
 bidict==0.18.0
@@ -106,6 +107,11 @@ pbr==5.4.4
 asteval==0.9.15
 six==1.12.0
 uncertainties==3.1.2
+pyinstaller==3.6
+pywin32-ctypes==0.2.0
+pefile==2019.4.18
+altgraph==0.17
+future==0.18.2
 "
 
     build_pip install --no-deps --no-binary ":all:" --upgrade \
