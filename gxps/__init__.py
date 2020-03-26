@@ -9,7 +9,11 @@ __website__ = "https://github.com/schachmett/gxps"
 
 # maybe use release_string() instead?
 try:
-    from pbr.version import VersionInfo
-    __version__ = VersionInfo("gxps").version_string()
+    import sys
+    if sys.platform == "win32":
+        __version__ = "windows-version"
+    else:
+        from pbr.version import VersionInfo
+        __version__ = VersionInfo("gxps").version_string()
 except ImportError:
     __version__ = "devel"

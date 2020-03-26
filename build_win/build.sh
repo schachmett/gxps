@@ -28,7 +28,8 @@ function main {
     install_gxps "${GIT_TAG}"
     cp gxps.ico "${BUILD_ROOT}"
 #    cleanup_after
-    make_exe "${DISTDIR}"
+    make_exe
+    make_single_exe
 #    build_installer
 #    build_portable_installer
 }

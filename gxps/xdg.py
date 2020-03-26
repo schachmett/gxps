@@ -23,23 +23,20 @@ DATA_DIRS = [DATA_DIR]
 if os.getenv("XDG_DATA_DIRS"):
     XDG_DATA_DIRS = os.getenv("XDG_DATA_DIRS").split(os.pathsep)
     DATA_DIRS.extend([Path(d) / "gxps" for d in XDG_DATA_DIRS])
-if sys.platform == "win32":
-    DATA_DIRS.append(GXPS_DIR / "data")
 
 CONF_DIR = Path(GLib.get_user_config_dir()) / "gxps"
 CONF_DIRS = [CONF_DIR]
 if os.getenv("XDG_CONFIG_DIRS"):
     XDG_CONFIG_DIRS = os.getenv("XDG_CONFIG_DIRS").split(os.pathsep)
     CONF_DIRS.extend([Path(d) / "gxps" for d in XDG_CONFIG_DIRS])
-if sys.platform == "win32" or LOCAL_HACK:
+if LOCAL_HACK or sys.platform == "win32":
     CONF_DIRS.append(GXPS_DIR / "data/config")
 
 CACHE_DIR = Path(GLib.get_user_cache_dir()) / "gxps"
 
+LOG_DIR = CACHE_DIR / "logs"
 if sys.platform == "win32":
-    LOG_DIR = DATA_DIR / "logs"
-else:
-    LOG_DIR = CACHE_DIR / "logs"
+    LOG_DIR = CONF_DIR / "logs"
 LOG_FILE = LOG_DIR / "gxps.log"
 
 

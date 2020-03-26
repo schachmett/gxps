@@ -187,6 +187,10 @@ function make_exe {
 #        gxps.spec
 }
 
+function make_single_exe {
+    build_python -m PyInstaller --icon gxps.ico --windowed --onefile gxps_onefile.spec
+}
+
 function make_installer {
     echo "not implemented"
 }

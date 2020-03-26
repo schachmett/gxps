@@ -6,7 +6,7 @@ pathex = "C:/msys64/home/Simon/gxps/build_win/"
 package_dir = "_build_root/mingw64/lib/python3.8/site-packages/gxps/"
 
 datas_dir = os.path.join(pathex, "_build_root/mingw64/share/gxps")
-# package_dir = os.path.join(pathex, package_dir)
+package_dir = os.path.join(pathex, package_dir)
 afile = os.path.join(package_dir, "main.py")
 
 block_cipher = None
@@ -23,7 +23,6 @@ datas =[
 a = Analysis(
     [afile],
     pathex=[pathex],
-    icon="gxps.ico",
     binaries=None,
     datas=datas,
     hiddenimports=hiddenimports,
@@ -32,7 +31,8 @@ a = Analysis(
     excludes=['tcl', 'tk', '_tkinter', 'tkinter', 'Tkinter'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
-    cipher=block_cipher
+    cipher=block_cipher,
+    noarchive=False
 )
 
 pyz = PYZ(
@@ -44,21 +44,18 @@ pyz = PYZ(
 exe = EXE(
     pyz,
     a.scripts,
-    exclude_binaries=True,
-    name="gxps",
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    [],
+    name="gxps-win",
     debug=False,
+    bootloader_ignore_signals=False,
     strip=False,
     upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
     console=False,
     icon="gxps.ico"
 )
 
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    name="gxps"
-)
