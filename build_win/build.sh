@@ -24,7 +24,7 @@ function main {
     install_pre_deps
     create_root
     install_deps
-#    cleanup_before
+    cleanup_before
     install_gxps "${GIT_TAG}"
     cp gxps.ico "${BUILD_ROOT}"
 #    cleanup_after

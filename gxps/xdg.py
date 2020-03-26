@@ -17,7 +17,7 @@ HOME_DIR = os.path.expanduser("~")
 LOCAL_HACK = (GXPS_DIR / "data").is_dir() and sys.platform != "win32"
 
 DATA_DIR = Path(GLib.get_user_data_dir()) / "gxps"
-if LOCAL_HACK:
+if LOCAL_HACK or sys.platform == "win32":
     DATA_DIR = GXPS_DIR / "data"
 DATA_DIRS = [DATA_DIR]
 if os.getenv("XDG_DATA_DIRS"):

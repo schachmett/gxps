@@ -5,6 +5,8 @@ from PyInstaller.utils.hooks import collect_submodules
 pathex = "C:/msys64/home/Simon/gxps/build_win/_build_root"
 package_dir = "mingw64/lib/python3.8/site-packages/gxps/"
 
+datas_dir = os.path.join(pathex, "mingw64/share/gxps")
+package_dir = os.path.join(pathex, package_dir)
 afile = os.path.join(package_dir, "main.py")
 
 block_cipher = None
@@ -14,7 +16,7 @@ hiddenimports = collect_submodules("packaging") + \
                 collect_submodules("gxps")
 
 datas =[
-  (os.path.join(package_dir, "assets"), 'gxps/assets')
+  (datas_dir, 'data')
 ]
 
 

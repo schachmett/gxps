@@ -125,9 +125,10 @@ function install_gxps {
     rm -Rf "${REPO_CLONE}"
     git clone "${BASEDIR}"/.. "${REPO_CLONE}"
 
-    (cd "${REPO_CLONE}" && git checkout "$1") || exit 1
+    pushd "${REPO_CLONE}"
+    git checkout "$1" || exit 1
 
-    build_python "${REPO_CLONE}"/setup.py install
+    build_python setup.py install
 
 #    # Create launchers
 #    python3 "${MISC}"/create-launcher.py \
@@ -143,7 +144,7 @@ function install_gxps {
         local GIT_HASH=$(git rev-parse --short HEAD)
         GXPS_VERSION_DESC="$GXPS_VERSION-rev$GIT_REV-$GIT_HASH"
     fi
-
+    popd
 #    build_compileall -d "" -f -q "$(cygpath -w "${MINGW_ROOT}")"
 }
 
@@ -179,11 +180,11 @@ function cleanup_before {
 
 
 function make_exe {
-    build_python -m PyInstaller --clean \
-        --distpath ${1} \
-        --workpath _build \
-        --paths _inst/usr/lib/gxps \    #TODO DESTDIR
-        gxps.spec
+    build_python -m PyInstaller gxps.spec #--clean \
+#        --distpath ${1} \
+#        --workpath _build \
+#        --paths _inst/usr/lib/gxps \    #TODO DESTDIR
+#        gxps.spec
 }
 
 function make_installer {
