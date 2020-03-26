@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # This windows building routine was largely adopted from the
-# Quod Libet project 
+# Quod Libet project
 # https://github.com/quodlibet/quodlibet (C) 2016 Christoph Reiter
 # and the Python GTK3 GStreamer SDK
 # https://github.com/exaile/python-gtk3-gst-sdk (C) 2015 Dustin Spicuzza
 
 
 function catch_sigint {
-  echo "Caught kill signal, exiting..."
-  exit 1
+    echo "Caught kill signal, exiting..."
+    exit 1
 }
 
 trap catch_sigint SIGINT;
@@ -21,8 +21,8 @@ BASEDIR=$(pwd)
 
 ARCH="x86_64"
 BUILD_VERSION="0"
-GXPS_VERSION="0.8.1"
-GXPS_VERSION_DESC="win-0.8.1"
+GXPS_VERSION="0.0.0"
+GXPS_VERSION_DESC="UNKOWN"
 
 # CONFIG END
 
@@ -39,7 +39,18 @@ function set_build_root {
     export PATH="${MINGW_ROOT}/bin:${PATH}"
 }
 
-set_build_root "${BASEDIR}/_build_root"
+function create_root {
+    mkdir -p "${BUILD_ROOT}"
+
+    mkdir -p "${BUILD_ROOT}"/var/lib/pacman
+    mkdir -p "${BUILD_ROOT}"/var/log
+    mkdir -p "${BUILD_ROOT}"/tmp
+
+    mkdir -p "${BUILD_ROOT}"/home
+
+    build_pacman -Syu
+    build_pacman --noconfirm -S base
+}
 
 function build_pacman {
     pacman --cachedir "/var/cache/pacman/pkg" --root "${BUILD_ROOT}" "$@"
@@ -54,11 +65,13 @@ function build_python {
 }
 
 function build_compileall_pyconly {
-    MSYSTEM= build_python -m compileall --invalidation-mode unchecked-hash -b "$@"
+    MSYSTEM= build_python -m compileall \
+        --invalidation-mode unchecked-hash -b "$@"
 }
 
 function build_compileall {
-    MSYSTEM= build_python -m compileall --invalidation-mode unchecked-hash "$@"
+    MSYSTEM= build_python -m compileall \
+        --invalidation-mode unchecked-hash "$@"
 }
 
 function install_pre_deps {
@@ -69,19 +82,6 @@ function install_pre_deps {
         mingw-w64-"${ARCH}"-nsis \
         wget \
         mingw-w64-"${ARCH}"-toolchain
-}
-
-function create_root {
-    mkdir -p "${BUILD_ROOT}"
-
-    mkdir -p "${BUILD_ROOT}"/var/lib/pacman
-    mkdir -p "${BUILD_ROOT}"/var/log
-    mkdir -p "${BUILD_ROOT}"/tmp
-    
-    mkdir -p "${BUILD_ROOT}"/home
-
-    build_pacman -Syu
-    build_pacman --noconfirm -S base
 }
 
 function install_deps {
@@ -96,7 +96,7 @@ function install_deps {
         mingw-w64-"${ARCH}"-python3-scipy \
         mingw-w64-"${ARCH}"-python3-more-itertools \
         mingw-w64-"${ARCH}"-python3-pbr \
-        mingw-w64-"${ARCH}"-python3-pytest 
+        mingw-w64-"${ARCH}"-python3-pytest
 
 # setuptools: https://github.com/pypa/setuptools/issues/1963
     PIP_REQUIREMENTS="\
@@ -124,28 +124,28 @@ function install_gxps {
 
     rm -Rf "${REPO_CLONE}"
     git clone "${BASEDIR}"/.. "${REPO_CLONE}"
-
     pushd "${REPO_CLONE}"
+
     git checkout "$1" || exit 1
 
     build_python setup.py install
 
-#    # Create launchers
-#    python3 "${MISC}"/create-launcher.py \
-#        "${GXPS_VERSION}" "${MINGW_ROOT}"/bin
+    local GXPS_PIP_STRING=$(build_pip show "gxps" | grep "Version:")
+    GXPS_RELEASE=$(echo $V | sed -re 's/Version: //g')
+    GXPS_VERSION=$(echo $GXPS_RELEASE | sed -e 's/\.[a-z]+.*//g')
+    # GXPS_VERSION=$(git describe --abbrev=0 $1)
+    # GXPS_VERSION_DESC="$GXPS_VERSION"
+    # if [ "$1" = "master" ]
+    # then
+    #     local GIT_REV=$(git rev-list --count HEAD)
+    #     local GIT_HASH=$(git rev-parse --short HEAD)
+    #     GXPS_VERSION_DESC="$GXPS_VERSION-rev$GIT_REV-$GIT_HASH"
+    # fi
 
-#    GXPS_VERSION=$(MSYSTEM= build_python -c \
-#        "import gxps; import sys; sys.stdout.write(gxps.__version__)")
-    GXPS_VERSION=$(git describe --abbrev=0 $1)
-    GXPS_VERSION_DESC="$GXPS_VERSION"
-    if [ "$1" = "master" ]
-    then
-        local GIT_REV=$(git rev-list --count HEAD)
-        local GIT_HASH=$(git rev-parse --short HEAD)
-        GXPS_VERSION_DESC="$GXPS_VERSION-rev$GIT_REV-$GIT_HASH"
-    fi
     popd
-#    build_compileall -d "" -f -q "$(cygpath -w "${MINGW_ROOT}")"
+
+    echo $GXPS_RELEASE > "${BASEDIR}"/../data/release.txt
+    echo $GXPS_VERSION > "${BASEDIR}"/../data/version.txt
 }
 
 function cleanup_before {
@@ -165,6 +165,7 @@ function cleanup_before {
     rm -Rf "${MINGW_ROOT}"/lib/python3.*/test
     rm -f "${MINGW_ROOT}"/lib/python3.*/lib-dynload/_tkinter*
     rm -Rf "${MINGW_ROOT}"/lib/python3.8/lib2to3/tests
+    # cannot remove numpy tests?
 #    find "${MINGW_ROOT}"/lib/python3.* -type d -name "test*" \
 #        -prune -exec rm -rf {} \;
 #    find "${MINGW_ROOT}"/lib/python3.* -type d -name "*_test*" \
@@ -172,25 +173,35 @@ function cleanup_before {
 
     find "${MINGW_ROOT}"/bin -name "*.pyo" -exec rm -f {} \;
     find "${MINGW_ROOT}"/bin -name "*.pyc" -exec rm -f {} \;
-
-#    build_compileall_pyconly -d "" -f -q "$(cygpath -w "${MINGW_ROOT}")"
-#    find "${MINGW_ROOT}" -name "*.py" -exec rm -f {} \;
-#    find "${MINGW_ROOT}" -type d -name "__pycache__" -prune -exec rm -rf {} \;
 }
 
+function build_ico {
+    convert "${BASEDIR}"../data/assets/icons/hicolor/48x48/gxps.png gxps.ico
+    cp gxps.ico "${BUILD_ROOT}"
+}
 
 function make_exe {
-    build_python -m PyInstaller gxps.spec #--clean \
-#        --distpath ${1} \
-#        --workpath _build \
-#        --paths _inst/usr/lib/gxps \    #TODO DESTDIR
-#        gxps.spec
+    [ -z "$1" ] && (echo "Missing arg"; exit 1)
+
+    build_python -m PyInstaller \
+        --distpath "${1}"
+        gxps.spec
+
+    mv "${1}"/gxps "${1}"/gxps-"${GXPS_RELEASE}" || true
 }
 
 function make_single_exe {
-    build_python -m PyInstaller --icon gxps.ico --windowed --onefile gxps_onefile.spec
+    [ -z "$1" ] && (echo "Missing arg"; exit 1)
+
+    build_python -m PyInstaller \
+        --distpath "${1}" \
+        --windowed \
+        --onefile \
+        gxps_onefile.spec
+
+    mv "${1}"/gxps.exe "${1}"/gxps-"${GXPS_RELEASE}".exe || true
 }
 
 function make_installer {
-    echo "not implemented"
+    echo "making the installer is not implemented"
 }

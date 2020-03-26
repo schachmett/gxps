@@ -13,8 +13,11 @@ __release__ = "unknown"
 try:
     import sys
     if sys.platform == "win32":
-        __version__ = "windows-version"
-        __release__ = "windows-version"
+        from gxps.xdg import DATA_DIR
+        with open(DATA_DIR / "version.txt") as vfile:
+            __version__ = vfile.readline().strip()
+        with open(DATA_DIR / "release.txt") as rfile:
+            __release__ = rfile.readline().strip()
     else:
         from pbr.version import VersionInfo
         __version__ = VersionInfo("gxps").version_string()
@@ -22,3 +25,6 @@ try:
 except ImportError:
     __version__ = "devel"
     __release__ = "devel"
+except FileNotFoundError:
+    __version__ = "missingversion"
+    __release__ = "missingrelease"

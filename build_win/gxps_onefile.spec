@@ -1,12 +1,17 @@
-import sys
+"""Spec file for PyInstaller."""
+# pylint: disable=invalid-name
+# pylint: disable=undefined-variable
+
 import os.path
 from PyInstaller.utils.hooks import collect_submodules
 
-pathex = "C:/msys64/home/Simon/gxps/build_win/"
-package_dir = "_build_root/mingw64/lib/python3.8/site-packages/gxps/"
 
-datas_dir = os.path.join(pathex, "_build_root/mingw64/share/gxps")
-package_dir = os.path.join(pathex, package_dir)
+pathex = os.path.abspath(SPECPATH)
+package_dir = "_build_root/mingw64/lib/python3.8/site-packages/gxps/"
+datas_dir = "_build_root/mingw64/share/gxps"
+icon_path = "gxps.ico"
+
+datas = [(datas_dir, 'data')]
 afile = os.path.join(package_dir, "main.py")
 
 block_cipher = None
@@ -15,14 +20,10 @@ hiddenimports = collect_submodules("packaging") + \
                 collect_submodules("pkg_resources.py2_warn") + \
                 collect_submodules("gxps")
 
-datas =[
-  (datas_dir, 'data')
-]
-
-
 a = Analysis(
     [afile],
     pathex=[pathex],
+    icon=icon_path,
     binaries=None,
     datas=datas,
     hiddenimports=hiddenimports,
@@ -48,14 +49,13 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name="gxps-win",
+    name="gxps",
     debug=False,
-    bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     upx_exclude=[],
-    runtime_tmpdir=None,
     console=False,
-    icon="gxps.ico"
+    bootloader_ignore_signals=False,
+    runtime_tmpdir=None,
+    icon=icon_path
 )
-

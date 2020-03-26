@@ -9,7 +9,9 @@ from gi.repository import GLib
 
 
 GXPS_DIR = Path(os.path.realpath(__file__)).parents[1]
-if os.getenv("GXPS_DIR"):
+# The following hack works only if the gxps.py setting the env var is
+# one directory above the gxps package
+if os.getenv("GXPS_DIR") and sys.platform == "win32":
     GXPS_DIR = Path(os.getenv("GXPS_DIR"))
     print("INFO    : Source dir taken from environment variable.")
 HOME_DIR = os.path.expanduser("~")

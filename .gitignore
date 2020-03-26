@@ -8,3 +8,5 @@ dist
 *.egg-info
 *.egg
 tests/plot_verification
+data/release.txt
+data/version.txt

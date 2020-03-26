@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
 # This windows building routine was largely adopted from the
-# Quod Libet project 
+# Quod Libet project
 # https://github.com/quodlibet/quodlibet (Copyright 2016 Christoph Reiter)
 
 set -e
 
-BASEDIR="$( cd $( dirname $0 ) && pwd )"
-DESTDIR="${BASEDIR}"/_inst
-DISTDIR="${BASEDIR}"/gxps_win
+GXPS_VERSION="0.0.0"
+GXPS_VERSION_DESC="UNKOWN"
+
+BASEDIR="$(dirname $0)"
+cd "${BASEDIR}"
+DISTDIR="${BASEDIR}"/../dist_win
 source "${BASEDIR}"/_base.sh
 
 function main {
     local GIT_TAG=${1:-"master"}
+
+    set_build_root "${BASEDIR}/_build_root"
 
     [[ -d "${BUILD_ROOT}" ]] && (echo "${BUILD_ROOT} already exists"; exit 1)
 
@@ -26,12 +31,10 @@ function main {
     install_deps
     cleanup_before
     install_gxps "${GIT_TAG}"
-    cp gxps.ico "${BUILD_ROOT}"
-#    cleanup_after
-    make_exe
-    make_single_exe
-#    build_installer
-#    build_portable_installer
+    build_ico
+    make_exe ${DISTDIR}
+    make_single_exe ${DISTDIR}
+    build_installer
 }
 
 main "$@";
