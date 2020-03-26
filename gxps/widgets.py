@@ -12,7 +12,7 @@ from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg
 from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3
 from matplotlib.figure import Figure
 
-from gxps import __appname__, __version__, __authors__, __website__
+from gxps import __appname__, __release__, __authors__, __website__
 from gxps.config import COLORS, CONFIG
 from gxps.state import State
 from gxps.canvas_tools import (
@@ -280,7 +280,7 @@ class GXPSAboutDialog(Gtk.AboutDialog):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.set_program_name(__appname__)
-        self.set_version("Version: {}".format(__version__))
+        self.set_version("Version: {}".format(__release__))
         self.set_authors(__authors__)
         self.set_website(__website__)
         self.set_license_type(Gtk.License.GPL_3_0)

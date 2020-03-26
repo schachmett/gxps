@@ -8,8 +8,11 @@ def main():
     if "--version" in sys.argv:
         __version__ = "unknown"
         try:
-            from pbr.version import VersionInfo
-            __version__ = VersionInfo("gxps").release_string()
+            if sys.platform == "win32":
+                __version__ = "windows-version"
+            else:
+                from pbr.version import VersionInfo
+                __version__ = VersionInfo("gxps").release_string()
         except ImportError:
             __version__ = "devel"
         print(__version__)
