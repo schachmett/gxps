@@ -35,8 +35,8 @@ class CommandSender:
             "open-project": self._file.on_open,
             "merge-project": self._file.on_merge,
             "import-spectra": self._file.on_import,
-            "export-txt": lambda *x: None,
-            "export-image": lambda *x: None,
+            "export-txt": self._file.on_export_txt,
+            "export-image": self._file.on_start_image_exporter,
 
             # Edit actions
             "edit-spectra": self._edit.on_edit_spectra,

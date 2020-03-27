@@ -188,6 +188,60 @@ class File(Operator):
             self.save(fname)
         dialog.hide()
 
+    def on_export_txt(self, *_args):
+        """Exports the currently selected spectra and their fits to an ASCII
+        file.
+        """
+        spectra = self.state.active_spectra
+        dialog = self.get_widget("export_txt_dialog")
+        project_dir = os.path.expandvars(CONFIG["IO"]["project-dir"])
+        dialog.set_current_folder(project_dir)
+        for spectrum in spectra:
+            name = re.sub(r"\s+", "_", spectrum.name)
+            dialog.set_current_name(name + ".txt")
+            response = dialog.run()
+            if response == Gtk.ResponseType.OK:
+                fname = dialog.get_filename()
+                gxps.io.export_txt(fname, spectrum)
+        CONFIG["IO"]["project-dir"] = dialog.get_current_folder()
+        dialog.hide()
+
+    def on_export_image(self, *_args):
+        """Exports the image currently displayed on the exporting canvas.
+        """
+        spectra = self.state.active_spectra
+        canvas = self.get_widget("export_canvas")
+        dialog = self.get_widget("export_img_dialog")
+        project_dir = os.path.expandvars(CONFIG["IO"]["project-dir"])
+        dialog.set_current_folder(project_dir)
+        name = "_".join([re.sub(r"\s+", "-", s.name) for s in spectra])
+        dialog.set_current_name(name + ".png")
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            fname = dialog.get_filename()
+            canvas.saveas(fname)
+            CONFIG["IO"]["project-dir"] = dialog.get_current_folder()
+            dialog.hide()
+            return True
+        dialog.hide()
+        return False
+
+    def on_start_image_exporter(self, *_args):
+        """Exports the currently selected spectra and their fits as an image.
+        """
+        spectra = self.state.active_spectra
+        dialog = self.get_widget("export_canvas_dialog")
+        canvas = self.get_widget("export_canvas")
+        canvas.plot_spectra(spectra)
+        success = False
+        while not success:
+            response = dialog.run()
+            if response == Gtk.ResponseType.OK:
+                success = self.on_export_image()
+            else:
+                success = True
+        dialog.hide()
+
 
 class Edit(Operator):
     """Contains methods for user initiated data manipulation."""

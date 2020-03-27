@@ -46,6 +46,34 @@ class GXPSAppWindow(Gtk.ApplicationWindow):
         super().show_all()
 
 
+class GXPSExportCanvas(FigureCanvasGTK3Agg):
+    """Canvas for drawing the spectra prior to export.
+    """
+    # pylint: disable=invalid-name
+    __gtype_name__ = "GXPSExportCanvas"
+    def __init__(self):
+        figure = Figure()
+        super().__init__(figure)
+        self._ax = self.figure.add_subplot(111)
+
+    def plot_spectra(self, spectra):
+        """Plots given spectra."""
+        for spectrum in spectra:
+            self._ax.plot(spectrum.energy, spectrum.intensity)
+            if spectrum.background.any():
+                self._ax.plot(spectrum.energy, spectrum.background)
+            if spectrum.fit.any():
+                intensity = spectrum.background + spectrum.fit
+                self._ax.plot(spectrum.energy, intensity)
+            for peak in spectrum.peaks:
+                intensity = spectrum.background + peak.intensity
+                self._ax.plot(spectrum.energy, intensity, ls="-")
+
+    def saveas(self, fname, **kwargs):
+        """Saves the plot to an image file."""
+        self.figure.savefig(fname, **kwargs)
+
+
 class GXPSCanvas(FigureCanvasGTK3Agg):
     """Canvas for drawing the spectra.
     """
@@ -355,6 +383,47 @@ class GXPSSaveProjectDialog(Gtk.FileChooserDialog):
             ("_Cancel", Gtk.ResponseType.CANCEL, "_Save", Gtk.ResponseType.OK),
         )
         self.add_filter(FileFilter(".gxps", ["*.gxps"]))
+        self.set_do_overwrite_confirmation(True)
+
+
+
+class GXPSExportTXTDialog(Gtk.FileChooserDialog):
+    """File chooser dialog for spectrum importing."""
+    __gtype_name__ = "GXPSExportTXTDialog"
+    def __init__(self, *_args, **_kwargs):
+        super().__init__(
+            "Export as textfile...",
+            None,
+            Gtk.FileChooserAction.SAVE,
+            ("_Cancel", Gtk.ResponseType.CANCEL, "_Save", Gtk.ResponseType.OK),
+        )
+        self.add_filter(FileFilter(".txt", ["*.txt", "*.csv"]))
+        self.set_do_overwrite_confirmation(True)
+
+
+class GXPSExportIMGDialog(Gtk.FileChooserDialog):
+    """File chooser dialog for spectrum importing."""
+    __gtype_name__ = "GXPSExportIMGDialog"
+    def __init__(self, *_args, **_kwargs):
+        super().__init__(
+            "Export as image...",
+            None,
+            Gtk.FileChooserAction.SAVE,
+            ("_Cancel", Gtk.ResponseType.CANCEL, "_Save", Gtk.ResponseType.OK),
+        )
+        self.add_filter(FileFilter(
+            "raster image",
+            ["*.png", "*.jpeg", "*.jpg"]
+        ))
+        self.add_filter(FileFilter(
+            "vector image",
+            ["*.pdf", "*.svg"]
+        ))
+        self.add_filter(FileFilter(
+            "all images",
+            ["*.png, *.jpeg", "*.jpg", "*.svg", "*.pdf"]
+        ))
+        self.add_filter(FileFilter("all", ["*"]))
         self.set_do_overwrite_confirmation(True)
 
 

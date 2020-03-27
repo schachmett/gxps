@@ -311,6 +311,11 @@ class ModeledSpectrum(Spectrum):
         """Returns fit result on whole energy range."""
         with IgnoreUnderflow():
             fit = self.model.eval(params=self.params, x=self.energy)
+        try:
+            if len(fit) != len(self.energy):
+                LOG.warning("Fit array has different length as energy array.")
+        except TypeError:
+            fit = np.zeros(self.energy.shape)
         return fit
 
     def fit_of_E(self, energy):

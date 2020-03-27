@@ -42,6 +42,18 @@
             generic-name="gxpssaveprojectdialog"/>
             
         <glade-widget-class
+            title="GXPS Export TXT Dialog"
+            name="GXPSExportTXTDialog" 
+            parent="GtkFileChooserDialog" 
+            generic-name="gxpsexporttxtdialog"/>
+            
+        <glade-widget-class
+            title="GXPS Export IMG Dialog"
+            name="GXPSExportIMGDialog" 
+            parent="GtkFileChooserDialog" 
+            generic-name="gxpsexportimgdialog"/>
+            
+        <glade-widget-class
             title="GXPS Save Confirmation Dialog"
             name="GXPSSaveConfirmationDialog" 
             parent="GtkDialog" 
@@ -76,6 +88,12 @@
             name="GXPSCanvas"
             parent="GtkDrawingArea"
             generic-name="gxpscanvas"/>
+            
+        <glade-widget-class
+            title="GXPS Export Canvas"
+            name="GXPSExportCanvas"
+            parent="GtkDrawingArea"
+            generic-name="gxpsexportcanvas"/>
             
         <glade-widget-class
             title="GXPS CanvasObjects"

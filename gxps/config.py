@@ -6,7 +6,6 @@ import sys
 import configparser
 import logging
 import logging.config
-# import datetime
 import traceback
 
 from gxps.xdg import DATA_DIR, CONF_DIR, LOG_FILE, _make_missing_dirs
