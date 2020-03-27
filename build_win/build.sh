@@ -26,15 +26,31 @@ function main {
         exit $?
     fi
 
+    echo "###########################################"
+    echo "Installing tools for building"
     install_pre_deps
+    echo "###########################################"
+    echo "Creating _build_root directory"
     create_root
+    echo "###########################################"
+    echo "Installing dependencies"
     install_deps
+    echo "###########################################"
+    echo "Deleting some annoying files"
     cleanup_before
+    echo "###########################################"
+    echo "Installing GXPS to _build_root"
     install_gxps "${GIT_TAG}"
-    build_ico
+    move_ico
+    echo "###########################################"
+    echo "Making Executable in folder"
     make_exe ${DISTDIR}
+    echo "###########################################"
+    echo "Making one-file Executable"
     make_single_exe ${DISTDIR}
-    build_installer
+    echo "###########################################"
+    echo "Making Installer"
+    make_installer
 }
 
 main "$@";

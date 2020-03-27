@@ -4,7 +4,7 @@
 *~
 *.backup
 build
-dist
+dist*
 *.egg-info
 *.egg
 tests/plot_verification

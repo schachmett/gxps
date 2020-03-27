@@ -131,21 +131,23 @@ function install_gxps {
     build_python setup.py install
 
     local GXPS_PIP_STRING=$(build_pip show "gxps" | grep "Version:")
-    GXPS_RELEASE=$(echo $V | sed -re 's/Version: //g')
-    GXPS_VERSION=$(echo $GXPS_RELEASE | sed -e 's/\.[a-z]+.*//g')
+    # pip seems to crash? Using git method instead
+    local GXPS_PIP_STRING=$(build_pip show "gxps" | grep "Version:")
+    GXPS_RELEASE=$(echo $GXPS_PIP_STRING | sed -re 's/Version: //g')
+    GXPS_VERSION=$(echo $GXPS_RELEASE | sed -re 's/\.[a-z]+.*//g')
     # GXPS_VERSION=$(git describe --abbrev=0 $1)
-    # GXPS_VERSION_DESC="$GXPS_VERSION"
+    # GXPS_RELEASE="${GXPS_VERSION}"
     # if [ "$1" = "master" ]
     # then
     #     local GIT_REV=$(git rev-list --count HEAD)
     #     local GIT_HASH=$(git rev-parse --short HEAD)
-    #     GXPS_VERSION_DESC="$GXPS_VERSION-rev$GIT_REV-$GIT_HASH"
+    #     GXPS_RELEASE="${GXPS_VERSION}.dev${GIT_REV}-${GIT_HASH}"
     # fi
 
     popd
 
-    echo $GXPS_RELEASE > "${BASEDIR}"/../data/release.txt
     echo $GXPS_VERSION > "${BASEDIR}"/../data/version.txt
+    echo $GXPS_RELEASE > "${BASEDIR}"/../data/release.txt
 }
 
 function cleanup_before {
@@ -175,8 +177,7 @@ function cleanup_before {
     find "${MINGW_ROOT}"/bin -name "*.pyc" -exec rm -f {} \;
 }
 
-function build_ico {
-    convert "${BASEDIR}"../data/assets/icons/hicolor/48x48/gxps.png gxps.ico
+function move_ico {
     cp gxps.ico "${BUILD_ROOT}"
 }
 
@@ -184,7 +185,7 @@ function make_exe {
     [ -z "$1" ] && (echo "Missing arg"; exit 1)
 
     build_python -m PyInstaller \
-        --distpath "${1}"
+        --distpath "${1}" \
         gxps.spec
 
     mv "${1}"/gxps "${1}"/gxps-"${GXPS_RELEASE}" || true

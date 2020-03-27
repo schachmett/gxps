@@ -1,5 +1,7 @@
 # Building the windows executables
 
+For now, this is only tested on Windows 10. According to the [PyInstaller documentation](https://pyinstaller.readthedocs.io/en/v3.3.1/usage.html#windows), there may be problems with missing `.dll`s on other Windows versions.
+
 ## Setting up MSYS2
 
 * Install MSYS2 from https://msys2.github.io/
@@ -23,5 +25,6 @@ If you want to build a windows executable, you don't need `bootstrap.sh`
 
 * Just run `./build.sh`
 * Wait
-* In the git root directory (`cd ..`), a `dist` folder should appear, containing a `gxps-$version` folder with an `gxps.exe` inside, and a standalone `gxps-$version.exe`
+* In the git root directory (`cd ..`), a `dist_win` folder should appear, containing a `gxps-$version` folder with an `gxps.exe` inside, and a standalone `gxps-$version.exe`
 * For now, the standalone `.exe` does not work
+* If you want to speed up the process, you can comment out various steps in the `build.sh` (e.g. installing dependencies)

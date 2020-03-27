@@ -23,7 +23,6 @@ hiddenimports = collect_submodules("packaging") + \
 a = Analysis(
     [afile],
     pathex=[pathex],
-    icon=icon_path,
     binaries=None,
     datas=datas,
     hiddenimports=hiddenimports,
