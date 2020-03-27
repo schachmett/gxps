@@ -119,6 +119,13 @@ future==0.18.2
 
 }
 
+function force_fetch_gxps {
+    pushd ".."
+    git fetch --all
+    git reset --hard origin/master
+    popd
+}
+
 function install_gxps {
     [ -z "$1" ] && (echo "Missing arg"; exit 1)
 
@@ -146,8 +153,8 @@ function install_gxps {
 
     popd
 
-    echo $GXPS_VERSION > "${BASEDIR}"/../data/version.txt
-    echo $GXPS_RELEASE > "${BASEDIR}"/../data/release.txt
+    echo "${GXPS_VERSION}" > "${MINGW_ROOT}"/share/gxps/version.txt
+    echo "${GXPS_RELEASE}" > "${MINGW_ROOT}"/share/gxps/release.txt
 }
 
 function cleanup_before {

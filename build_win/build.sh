@@ -13,12 +13,40 @@ cd "${BASEDIR}"
 DISTDIR="${BASEDIR}"/../dist_win
 source "${BASEDIR}"/_base.sh
 
+function header {
+    echo "############################################################"
+    echo "$@"
+    echo "############################################################"
+}
+
 function main {
     local GIT_TAG=${1:-"master"}
+    local REBUILD=""
+    if [ "$GIT_TAG" = "rebuild" ]; then
+        REBUILD="True"
+        GIT_TAG="master"
+    fi
+    
+    if [ ! -z $REBUILD ]; then
+        echo "Rebuilding and overwriting local repo from github!"
+        read -p "Are you sure to overwrite local repo? [yN]: " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]
+        then
+            echo "User aborted"
+            exit 1
+        else
+            echo "Proceeding..."
+        fi
+    else
+        echo "Doing normal build procedure"
+    fi
 
     set_build_root "${BASEDIR}/_build_root"
 
-    [[ -d "${BUILD_ROOT}" ]] && (echo "${BUILD_ROOT} already exists"; exit 1)
+    if [ -z "${REBUILD}" ]; then
+        [[ -d "${BUILD_ROOT}" ]] && (echo "${BUILD_ROOT} already exists"; exit 1)
+    fi
 
     # started from the wrong env -> switch
     if [ $(echo "$MSYSTEM" | tr '[A-Z]' '[a-z]') != "$MINGW" ]; then
@@ -26,31 +54,36 @@ function main {
         exit $?
     fi
 
-    echo "###########################################"
-    echo "Installing tools for building"
-    install_pre_deps
-    echo "###########################################"
-    echo "Creating _build_root directory"
-    create_root
-    echo "###########################################"
-    echo "Installing dependencies"
-    install_deps
-    echo "###########################################"
-    echo "Deleting some annoying files"
-    cleanup_before
-    echo "###########################################"
-    echo "Installing GXPS to _build_root"
+    if [ -z "${REBUILD}" ]; then
+        header "Installing tools for building"
+        install_pre_deps
+        
+        header "Creating _build_root directory"
+        create_root
+        
+        header "Installing dependencies"
+        install_deps
+        
+        header "Deleting some annoying files"
+        cleanup_before
+    else
+        header "Skipping _build_root preparation"
+        header "Force fetch from git!"
+        force_fetch_gxps
+    fi
+    
+    header "Installing GXPS to _build_root"
     install_gxps "${GIT_TAG}"
     move_ico
-    echo "###########################################"
-    echo "Making Executable in folder"
+    
+    header "Making Executable in folder"
     make_exe ${DISTDIR}
-    echo "###########################################"
-    echo "Making one-file Executable"
-    make_single_exe ${DISTDIR}
-    echo "###########################################"
-    echo "Making Installer"
-    make_installer
+    
+    header "Making one-file Executable not working yet"
+#    make_single_exe ${DISTDIR}
+    
+    header "Making Installer not implemented yet"
+#    make_installer
 }
 
 main "$@";
