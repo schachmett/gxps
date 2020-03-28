@@ -9,7 +9,6 @@ For now, this is only tested on Windows 10. According to the [PyInstaller docume
 	- run `pacman -Syu`
 	- you may need to restart MSYS2/MinGW64 or even your computer
 	- run `pacman -Su` again
-
 * Install git with `pacman -S git`
 * Clone this repo with `git clone https://schachmett.com/gxps.git`
 * Go to this directory (`cd gxps/build_win`)

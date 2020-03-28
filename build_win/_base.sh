@@ -195,7 +195,7 @@ function make_exe {
         --distpath "${1}" \
         gxps.spec
 
-    mv "${1}"/gxps "${1}"/gxps-"${GXPS_RELEASE}" || true
+    mv "${1}"/gxps "${1}"/gxps-win64-"${GXPS_RELEASE}" || true
 }
 
 function make_single_exe {
@@ -207,7 +207,7 @@ function make_single_exe {
         --onefile \
         gxps_onefile.spec
 
-    mv "${1}"/gxps.exe "${1}"/gxps-"${GXPS_RELEASE}".exe || true
+    mv "${1}"/gxps.exe "${1}"/gxps-win64-"${GXPS_RELEASE}".exe || true
 }
 
 function make_installer {
