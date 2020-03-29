@@ -5,8 +5,7 @@ startup."""
 
 import pytest
 
-from gxps import __appname__, __version__
-from gxps.__main__ import main
+from gxps.main import main
 
 def test_main():
     with pytest.raises(SystemExit):

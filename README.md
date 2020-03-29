@@ -26,13 +26,23 @@ GXPS is available via pip (don't use sudo!):
 $ python3 -m pip install gxps
 ```
 
-Upgrade via `$ python3 -m pip install --upgade gxps`. The pip installation also puts a `.desktop` file into the `$HOME/.local/share/applications` directory, so it should appear as a normal installed application. You can also call it via `$ gxps`.
+Update like this:
+
+```shell
+$ python3 -m pip install --no-deps --force-reinstall --upgade gxps
+```
+
+The pip installation puts a `.desktop` file into the `$HOME/.local/share/applications` directory, so it should appear as a normal installed application. You can also call it via `$ gxps`.
 
 ### Windows
 
 For running from source, please refer to [these instructions](build_win/README.md). The more convenient method, however, is just running the pre-built `.exe` that you can find [here](https://github.com/schachmett/gxps/releases/latest). Just download the appropriate `.zip` file and extract it. Inside is an executable that runs the program. GXPS creates a folder in `C:\Users\$USER\AppData\gxps` for log files and configuration files.
 
 I plan on making a standalone `.exe` without the big folder around it and also on maybe making an installer later. Please note that GXPS seems to be significantly slower in Windows. Also, the builds are only tested in Windows 10 and I have no idea if it runs on older versions. Also, GXPS is quite ugly on Windows. I will at least try and make icons that work in a non-dark mode.
+
+### OS X
+
+It seems to be possible to run GXPS on a Mac but I don't know how.
 
 ## Usage
 

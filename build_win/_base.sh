@@ -193,6 +193,8 @@ function make_exe {
 
     build_python -m PyInstaller \
         --distpath "${1}" \
+        --workpath "${BASEDIR}"/../build \
+        --windowed \
         gxps.spec
 
     mv "${1}"/gxps "${1}"/gxps-win64-"${GXPS_RELEASE}" || true
@@ -203,6 +205,7 @@ function make_single_exe {
 
     build_python -m PyInstaller \
         --distpath "${1}" \
+        --workpath "${BASEDIR}"/../build
         --windowed \
         --onefile \
         gxps_onefile.spec
