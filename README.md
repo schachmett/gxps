@@ -17,13 +17,13 @@ GTK needs to be version `>=3.14`. If you don't already have it installed, instal
 $ sudo apt install python3 pip3 libffi6 python3-gi
 ```
 
-GXPS is not yet on PyPI, but will soon be available via pip:
+GXPS is available via pip (don't use sudo!):
 
 ```shell
 $ python3 -m pip install gxps
 ```
 
-Upgrade via `$ python3 -m pip install --upgade gxps`.
+Upgrade via `$ python3 -m pip install --upgade gxps`. The pip installation also puts a `.desktop` file into the `$HOME/.local/share/applications` directory, so it should appear as a normal installed application.
 
 ### Windows
 
@@ -69,11 +69,11 @@ This section will explain the peak models that are used.
 
 ### PyPI
 
-The PyPI package is not created yet. However, later the building will work as follows:
+Uploading a new version of GXPS to the PyPI works as follows:
 
 ```shell
 python3 setup.py sdist bdist_wheel
-python3 -m twine upload dist/gxps-$VERSION
+python3 -m twine upload dist/*
 ```
 
 ### Windows
