@@ -1,6 +1,8 @@
 *.pyc
 *cache*
 *venv
+AUTHORS
+ChangeLog
 *~
 *.backup
 build
