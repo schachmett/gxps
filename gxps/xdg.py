@@ -16,11 +16,16 @@ if os.getenv("GXPS_DIR") and sys.platform == "win32":
     print("INFO    : Source dir taken from environment variable.")
 HOME_DIR = os.path.expanduser("~")
 
+# detect if running without being installed
 LOCAL_HACK = (GXPS_DIR / "data").is_dir() and sys.platform != "win32"
+# detect if running from a virtualenv
+VENV = hasattr(sys, "real_prefix")
 
 DATA_DIR = Path(GLib.get_user_data_dir()) / "gxps"
 if LOCAL_HACK or sys.platform == "win32":
     DATA_DIR = GXPS_DIR / "data"
+if VENV:
+    DATA_DIR = Path(sys.prefix) / "share/gxps"
 DATA_DIRS = [DATA_DIR]
 if os.getenv("XDG_DATA_DIRS"):
     XDG_DATA_DIRS = os.getenv("XDG_DATA_DIRS").split(os.pathsep)

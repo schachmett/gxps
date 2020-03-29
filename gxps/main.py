@@ -45,10 +45,20 @@ def main():
     # Test dependencies
     try:
         from gi.repository import GLib
-    except ImportError:
+    except (ImportError, ModuleNotFoundError):
         print("-" * 79)
-        print("please do sudo apt install python-gi")
+        print(
+            "There are some missing dependencies, please do:"
+            "$ sudo apt install python-gi libgirepository1.0-dev"
+            "python3-gi-cairo gir1.2-gtk-3.0"
+        )
         print("-" * 79)
+        try:
+            import logging
+            _log = logging.getLogger(__name__)
+            _log.critical("Missing GTK libraries")
+        except ImportError:
+            pass
         raise
 
     # Build app object
