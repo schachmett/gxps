@@ -34,14 +34,6 @@ def main():
     except ImportError:
         pass
 
-    # Set up config and logging
-    from gxps.config import (
-        activate_logging,
-        load_configs
-    )
-    load_configs()
-    activate_logging()
-
     # Test dependencies
     try:
         from gi.repository import GLib
@@ -53,13 +45,15 @@ def main():
             "python3-gi-cairo gir1.2-gtk-3.0"
         )
         print("-" * 79)
-        try:
-            import logging
-            _log = logging.getLogger(__name__)
-            _log.critical("Missing GTK libraries")
-        except ImportError:
-            pass
         raise
+
+    # Set up config and logging
+    from gxps.config import (
+        activate_logging,
+        load_configs
+    )
+    load_configs()
+    activate_logging()
 
     # Build app object
     from gxps.gui import GXPS

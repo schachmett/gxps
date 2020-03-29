@@ -1,9 +1,8 @@
 [Desktop Entry]
-Name=XPL
-GenericName=XPS Spectrum Analysis
+Name=GXPS
+GenericName=GXPS Spectrum Analysis
 Exec=gxps
 Terminal=false
 Type=Application
-Icon=xpl.svg
+Icon=gxps.svg
 StartupNotify=false
-Name[en_US]=com.github.schachmett.gxps.desktop

@@ -19,7 +19,7 @@ HOME_DIR = os.path.expanduser("~")
 # detect if running without being installed
 LOCAL_HACK = (GXPS_DIR / "data").is_dir() and sys.platform != "win32"
 # detect if running from a virtualenv
-VENV = hasattr(sys, "real_prefix")
+VENV = sys.prefix != sys.base_prefix
 
 DATA_DIR = Path(GLib.get_user_data_dir()) / "gxps"
 if LOCAL_HACK or sys.platform == "win32":

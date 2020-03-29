@@ -7,3 +7,4 @@ numpy==1.16.1
 pycairo==1.18.0
 scipy==1.2.0
 pbr==5.4.4
+PyGObject==3.36.0
