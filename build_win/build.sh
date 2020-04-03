@@ -8,8 +8,8 @@ set -e
 GXPS_VERSION="0.0.0"
 GXPS_VERSION_DESC="UNKOWN"
 
-BASEDIR="$(dirname $0)"
-cd "${BASEDIR}"
+pushd "$(dirname $0)"
+BASEDIR="$(pwd)"
 DISTDIR="${BASEDIR}"/../dist_win
 source "${BASEDIR}"/_base.sh
 
@@ -87,3 +87,5 @@ function main {
 }
 
 main "$@";
+
+popd;

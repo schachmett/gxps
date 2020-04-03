@@ -16,7 +16,6 @@ clean:
 	rm -Rf AUTHORS
 	rm -Rf *.backup
 	rm -Rf *~
-	rm -Rf build_win/_build_root
 
 bump_release:
 	@if [ ! -z $(TAG) ] && [ ! -z $(DESCRIPTION) ]; then \
@@ -33,6 +32,8 @@ dist: clean
 	python3 -m twine upload dist/*
 
 dist_win: clean
+	rm -Rf build_win/_build_root
+	rm -Rf build_win/build
 	build_win/build.sh
 	
 dist_win_re: clean

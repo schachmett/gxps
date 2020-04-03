@@ -4,7 +4,7 @@
 
 # GXPS
 
-*This project is still under development. Don't expect everything to work. If you encounter any bugs, please report them to me and include a logfile (On Linux: `~/.cache/gxps/logs`, on Windows: `C:\Users\$USER\AppData\gxps\logs`).*
+*This project is still under development. Don't expect everything to work. If you encounter any bugs, please report them to me and include a logfile (On Linux: `~/.cache/gxps/logs`, on Windows: `C:\Users\$USER\AppData\Local\gxps\logs`).*
 
 GXPS is a tool for visualizing and fitting X-ray photoelectron spectroscopy (XPS) data (although it may be possible to support also other kinds of spectroscopy data). For the fit, a variety of peak and background models are or will be implemented. Fit parameters can be constrained easily.
 
