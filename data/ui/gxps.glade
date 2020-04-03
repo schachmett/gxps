@@ -1481,11 +1481,13 @@
           </packing>
         </child>
         <child>
-          <object class="GtkBox">
+          <object class="GtkPaned">
             <property name="visible">True</property>
-            <property name="can_focus">False</property>
+            <property name="can_focus">True</property>
+            <property name="position">300</property>
             <child>
               <object class="GtkBox">
+                <property name="width_request">300</property>
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="orientation">vertical</property>
@@ -1498,11 +1500,13 @@
                     <property name="margin_top">10</property>
                     <property name="margin_bottom">10</property>
                     <property name="row_spacing">10</property>
-                    <property name="column_spacing">10</property>
+                    <property name="column_spacing">15</property>
                     <child>
-                      <object class="GtkEntry">
+                      <object class="GtkEntry" id="img_export_title">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
+                        <property name="hexpand">False</property>
+                        <signal name="activate" handler="on_img_export_change" swapped="no"/>
                       </object>
                       <packing>
                         <property name="left_attach">1</property>
@@ -1513,6 +1517,7 @@
                       <object class="GtkLabel">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
+                        <property name="hexpand">True</property>
                         <property name="label" translatable="yes">Plot Settings</property>
                       </object>
                       <packing>
@@ -1566,10 +1571,11 @@
                       </packing>
                     </child>
                     <child>
-                      <object class="GtkEntry">
+                      <object class="GtkEntry" id="img_export_xlabel">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
                         <property name="text" translatable="yes">Energy in eV</property>
+                        <signal name="activate" handler="on_img_export_change" swapped="no"/>
                       </object>
                       <packing>
                         <property name="left_attach">1</property>
@@ -1577,10 +1583,11 @@
                       </packing>
                     </child>
                     <child>
-                      <object class="GtkEntry">
+                      <object class="GtkEntry" id="img_export_ylabel">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
                         <property name="text" translatable="yes">Intensity in a.u.</property>
+                        <signal name="activate" handler="on_img_export_change" swapped="no"/>
                       </object>
                       <packing>
                         <property name="left_attach">1</property>
@@ -1593,10 +1600,12 @@
                         <property name="can_focus">False</property>
                         <property name="spacing">10</property>
                         <child>
-                          <object class="GtkSpinButton">
+                          <object class="GtkSpinButton" id="img_export_xsize">
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
+                            <property name="hexpand">True</property>
                             <property name="input_purpose">number</property>
+                            <signal name="change-value" handler="on_img_export_change" swapped="no"/>
                           </object>
                           <packing>
                             <property name="expand">False</property>
@@ -1605,9 +1614,11 @@
                           </packing>
                         </child>
                         <child>
-                          <object class="GtkSpinButton">
+                          <object class="GtkSpinButton" id="img_export_ysize">
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
+                            <property name="hexpand">True</property>
+                            <signal name="change-value" handler="on_img_export_change" swapped="no"/>
                           </object>
                           <packing>
                             <property name="expand">False</property>
@@ -1643,7 +1654,7 @@
                         <property name="margin_top">10</property>
                         <property name="margin_bottom">10</property>
                         <property name="row_spacing">10</property>
-                        <property name="column_spacing">10</property>
+                        <property name="column_spacing">15</property>
                         <child>
                           <object class="GtkLabel">
                             <property name="visible">True</property>
@@ -1710,6 +1721,8 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="halign">center</property>
+                            <property name="hexpand">True</property>
+                            <property name="active">True</property>
                           </object>
                           <packing>
                             <property name="left_attach">0</property>
@@ -1755,7 +1768,7 @@
                         <property name="margin_top">10</property>
                         <property name="margin_bottom">10</property>
                         <property name="row_spacing">10</property>
-                        <property name="column_spacing">10</property>
+                        <property name="column_spacing">15</property>
                         <child>
                           <object class="GtkLabel">
                             <property name="visible">True</property>
@@ -1822,6 +1835,8 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="halign">center</property>
+                            <property name="hexpand">True</property>
+                            <property name="active">True</property>
                           </object>
                           <packing>
                             <property name="left_attach">0</property>
@@ -1865,7 +1880,7 @@
                         <property name="margin_top">10</property>
                         <property name="margin_bottom">10</property>
                         <property name="row_spacing">10</property>
-                        <property name="column_spacing">10</property>
+                        <property name="column_spacing">15</property>
                         <child>
                           <object class="GtkLabel">
                             <property name="visible">True</property>
@@ -1932,6 +1947,8 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="halign">center</property>
+                            <property name="hexpand">True</property>
+                            <property name="active">True</property>
                           </object>
                           <packing>
                             <property name="left_attach">0</property>
@@ -1975,7 +1992,7 @@
                         <property name="margin_top">10</property>
                         <property name="margin_bottom">10</property>
                         <property name="row_spacing">10</property>
-                        <property name="column_spacing">10</property>
+                        <property name="column_spacing">15</property>
                         <child>
                           <object class="GtkLabel">
                             <property name="visible">True</property>
@@ -2042,6 +2059,8 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="halign">center</property>
+                            <property name="hexpand">True</property>
+                            <property name="active">True</property>
                           </object>
                           <packing>
                             <property name="left_attach">0</property>
@@ -2080,13 +2099,12 @@
                       <object class="GtkGrid">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="halign">center</property>
                         <property name="margin_left">10</property>
                         <property name="margin_right">10</property>
                         <property name="margin_top">10</property>
                         <property name="margin_bottom">10</property>
                         <property name="row_spacing">10</property>
-                        <property name="column_spacing">10</property>
+                        <property name="column_spacing">15</property>
                         <child>
                           <object class="GtkLabel">
                             <property name="visible">True</property>
@@ -2111,11 +2129,10 @@
                         </child>
                         <child>
                           <object class="GtkComboBoxText">
-                            <property name="width_request">29</property>
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
                             <items>
-                              <item translatable="yes">- - - - - - - - - - - - - - - - - - - - - - - - -</item>
+                              <item translatable="yes">- - - - - - - -</item>
                               <item translatable="yes">-------------</item>
                               <item translatable="yes">..............</item>
                               <item translatable="yes">oooooo</item>
@@ -2154,6 +2171,8 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="halign">center</property>
+                            <property name="hexpand">True</property>
+                            <property name="active">True</property>
                           </object>
                           <packing>
                             <property name="left_attach">0</property>
@@ -2190,21 +2209,21 @@
                     </child>
                   </object>
                   <packing>
-                    <property name="expand">False</property>
+                    <property name="expand">True</property>
                     <property name="fill">True</property>
                     <property name="position">1</property>
                   </packing>
                 </child>
               </object>
               <packing>
-                <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="position">0</property>
+                <property name="resize">False</property>
+                <property name="shrink">True</property>
               </packing>
             </child>
             <child>
               <object class="GtkViewport">
-                <property name="width_request">500</property>
+                <property name="width_request">1000</property>
+                <property name="height_request">500</property>
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <child>
@@ -2215,9 +2234,8 @@
                 </child>
               </object>
               <packing>
-                <property name="expand">True</property>
-                <property name="fill">True</property>
-                <property name="position">1</property>
+                <property name="resize">True</property>
+                <property name="shrink">True</property>
               </packing>
             </child>
           </object>

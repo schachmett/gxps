@@ -110,6 +110,7 @@ class GXPS(Gtk.Application):
             "on_peak_name_entry_changed",
             "on_peak_view_row_activated",
             "on_peak_model_combo_changed",
+            "on_img_export_change"
         ]
         actions = [
             "project-new", "save-project", "save-project-as", "open-project",

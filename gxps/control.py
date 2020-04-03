@@ -37,6 +37,7 @@ class CommandSender:
             "import-spectra": self._file.on_import,
             "export-txt": self._file.on_export_txt,
             "export-image": self._file.on_start_image_exporter,
+            "on_img_export_change": self._file.on_change_image_exporter,
 
             # Edit actions
             "edit-spectra": self._edit.on_edit_spectra,

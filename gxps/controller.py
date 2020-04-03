@@ -242,6 +242,18 @@ class File(Operator):
                 success = True
         dialog.hide()
 
+    def on_change_image_exporter(self, *_args):
+        """Changes the export canvas according to user settings."""
+        canvas = self.get_widget("export_canvas")
+        title = self.get_widget("img_export_title")
+        xlabel = self.get_widget("img_export_xlabel")
+        ylabel = self.get_widget("img_export_ylabel")
+        canvas.ax.set_title(title.get_text())
+        canvas.ax.set_xlabel(xlabel.get_text())
+        canvas.ax.set_ylabel(ylabel.get_text())
+        canvas.draw_idle()
+
+
 
 class Edit(Operator):
     """Contains methods for user initiated data manipulation."""

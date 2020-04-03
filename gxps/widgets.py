@@ -55,6 +55,25 @@ class GXPSExportCanvas(FigureCanvasGTK3Agg):
         figure = Figure()
         super().__init__(figure)
         self._ax = self.figure.add_subplot(111)
+        self._ax.invert_xaxis()
+
+    @property
+    def ax(self):
+        """Expose axis object."""
+        return self._ax
+
+    def _set_ticks(self):
+        """Configures axes ticks.
+        """
+        self.ax.tick_params(
+            reset=True,
+            axis="both",
+            direction="in",
+            labelsize="large",
+            labelcolor=COLORS["Image"]["axisticks"],
+            color=COLORS["Image"]["axisticks"],
+            labelleft=False
+        )
 
     def plot_spectra(self, spectra):
         """Plots given spectra."""
