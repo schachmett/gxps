@@ -6,7 +6,6 @@ import re
 import logging
 import pickle
 import sqlite3
-import copy
 
 import numpy as np
 
@@ -34,15 +33,12 @@ def convert_older_version(state):
 
 def save_project(fname, spectrum_container, gui_state):
     """Saves a StatefulSpectrumContainer as a file."""
-    spectra = copy.copy(spectrum_container.spectra)
     active_spectrum_idxs = []
     for spectrum in gui_state.active_spectra:
         s_idx = spectrum_container.spectra.index(spectrum)
         active_spectrum_idxs.append(s_idx)
-    for spectrum in spectra:
-        spectrum.unregister_all_queues()
-        for peak in spectrum.peaks:
-            peak.unregister_all_queues()
+    container = spectrum_container.deepcopy()
+    spectra = container.spectra
     state = [
         spectra,
         active_spectrum_idxs,

@@ -69,7 +69,7 @@ class GXPS(Gtk.Application):
 
     def do_activate(self):
         """Instantiate MainWindow."""
-        LOG.debug("Activating application...")
+        LOG.info("GXPS has version '{}'".format(__version__))
         # load the last used project file
         fname = CONFIG["IO"]["current-project"]
         self.commandsender(fname, "startup")

@@ -43,6 +43,11 @@ class SpectrumContainer(Observable):
         LOG.info("{} created".format(self))
 
     @property
+    def children(self):
+        """Observable children objects."""
+        return self.spectra
+
+    @property
     def spectra(self):
         """Returns spectrum objects."""
         return self._spectra.copy()
@@ -300,6 +305,11 @@ class ModeledSpectrum(Spectrum):
         self.params = Parameters()
         self._peaks = []
         super().__init__(*args, **kwargs)
+
+    @property
+    def children(self):
+        """Observable children objects."""
+        return self.peaks
 
     @property
     def peaks(self):

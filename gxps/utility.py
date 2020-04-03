@@ -2,6 +2,7 @@
 # pylint: disable=logging-format-interpolation
 
 import logging
+import copy
 
 
 LOG = logging.getLogger(__name__)
@@ -219,6 +220,35 @@ class Observable:
         super().__init__(*args, **kwargs)
 
     @property
+    def children(self):
+        """To be implemented by inherited classes. All references to
+        other Observable objects held inside the class should be given here.
+        Has to be strictly hierarchical!
+        """
+        return []
+
+    def deepcopy(self):
+        """Disconnect from all Observer stuff, copy and then reconnect."""
+        queues = self.queues
+        children_queues = {}
+        def unregister_children(obs):
+            """Recursively unregister children and following generations.
+            """
+            for child in obs.children:
+                children_queues[child] = child.queues
+                child.unregister_all_queues()
+                unregister_children(child)
+        unregister_children(self)
+        self.unregister_all_queues()
+        other = copy.deepcopy(self)
+        for queue in queues:
+            self.register_queue(queue)
+        for child, child_queues in children_queues.items():
+            for queue in child_queues:
+                child.register_queue(queue)
+        return other
+
+    @property
     def signals(self):
         """Makes signals accessible.
         """
@@ -229,7 +259,7 @@ class Observable:
     def queues(self):
         """Exposes queues.
         """
-        return self.queues.copy()
+        return self._queues.copy()
 
     def register_queue(self, queue):
         """Registers a queue where events are sent to.
@@ -238,6 +268,13 @@ class Observable:
         # TODO breaks older version
         # self.emit("registered-observable")
         LOG.debug("{} registered to queue {}".format(self, queue))
+
+    def register_children_to_queue(self, queue):
+        """Registers the children with the given queue.
+        """
+        for child in self.children:
+            child.register_children_to_queue(queue)
+            child.register_queue(queue)
 
     def unregister_queue(self, queue):
         """Unregisters a queue.
