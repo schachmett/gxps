@@ -6,16 +6,36 @@ def main():
     # Test for some cli options immediately
     import sys
     if "--version" in sys.argv:
-        __version__ = "unknown"
+        version = "unknown version"
         try:
-            if sys.platform == "win32":
-                __version__ = "windows-version"
-            else:
-                from pbr.version import VersionInfo
-                __version__ = VersionInfo("gxps").release_string()
+            from gxps import __version__
+            version = __version__
         except ImportError:
-            __version__ = "devel"
-        print(__version__)
+            if sys.platform == "win32":
+                version = "windows-release"
+            else:
+                try:
+                    from pbr.version import VersionInfo
+                    version = VersionInfo("gxps").version_string()
+                except ImportError:
+                    pass
+        print(version)
+        sys.exit(0)
+    if "--release" in sys.argv:
+        release = "unknown release"
+        try:
+            from gxps import __release__
+            release = __release__
+        except ImportError:
+            if sys.platform == "win32":
+                release = "windows-release"
+            else:
+                try:
+                    from pbr.version import VersionInfo
+                    version = VersionInfo("gxps").release_string()
+                except ImportError:
+                    pass
+        print(release)
         sys.exit(0)
 
 

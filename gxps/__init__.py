@@ -8,8 +8,8 @@ __authors__ = ["Simon Fischer <sf@simon-fischer.info>"]
 __website__ = "https://github.com/schachmett/gxps"
 
 # maybe use release_string() instead?
-__version__ = "unknown"
-__release__ = "unknown"
+__version__ = "unknown version"
+__release__ = "unknown release"
 try:
     import sys
     if sys.platform == "win32":
