@@ -1,0 +1,11 @@
+Low priority:
+* rehaul background bounds
+* fine tune bus priority and event checking
+* make detailed signals instead of putting everything in event properties
+
+Unclear if doable:
+* make emitting signals a decorator
+* make bus firing a decorator
+
+Unclear if it provides an advantage
+* abolish the CONFIG, COLORS and dunder singletons

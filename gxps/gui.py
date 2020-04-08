@@ -23,17 +23,6 @@ import gxps.widgets         # pylint: disable=unused-import
 LOG = logging.getLogger(__name__)
 
 
-# low-priority todos:
-# rehaul background bounds
-# viewer receiving management: combine events
-# make bus firing a decorator?
-# handle basic command line stuff before importing Gtk (in main.py?)
-# abolish the CONFIG, COLORS and dunder singletons (?)
-# fine tune bus priority and event checking
-# make detailed signals instead of putting everything in event properties
-# make emitting signals a decorator?
-
-
 class GXPS(Gtk.Application):
     """Application class organising user interaction."""
     # pylint: disable=arguments-differ
