@@ -323,13 +323,13 @@ class Fit(Operator):
     manipulation."""
     def on_add_region(self, *_args):
         """Add two region boundaries to each of the active spectra."""
+        navbar = self.get_widget("plot_toolbar")
         def add_region(emin, emax):
             """Add region"""
             for spectrum in self.state.active_spectra:
                 spectrum.background_type = "shirley"
                 spectrum.add_background_bounds(emin, emax)
         spanprops = {"edgecolor": COLORS["Plotting"]["region-vlines"], "lw": 2}
-        navbar = self.get_widget("plot_toolbar")
         navbar.get_span(add_region, **spanprops)
 
     @staticmethod
@@ -351,6 +351,7 @@ class Fit(Operator):
 
     def on_remove_region(self, *_args):
         """Remove selected region."""
+        navbar = self.get_widget("plot_toolbar")
         def remove_region(_x_0, _y_0, x_1, _y_1):
             """Remove region"""
             esel = x_1
@@ -359,11 +360,13 @@ class Fit(Operator):
                 for lower, upper in zip(bg_bounds[0::2], bg_bounds[1::2]):
                     if esel >= lower and esel <= upper:
                         spectrum.remove_background_bounds(lower, upper)
-        navbar = self.get_widget("plot_toolbar")
+                if not any(spectrum.background_bounds):
+                    spectrum.background_type = "none"
         navbar.get_point(remove_region)
 
     def on_add_peak(self, *_args):
         """Add peak to active regions."""
+        navbar = self.get_widget("plot_toolbar")
         shape_combo = self.get_widget("new_peak_model_combo")
         shape = shape_combo.get_active_text()
         def add_peak(position, height, angle):
@@ -375,7 +378,6 @@ class Fit(Operator):
                                          height=height, shape=shape)
                 peak.register_queue(self.bus)
         wedgeprops = {}
-        navbar = self.get_widget("plot_toolbar")
         navbar.get_wedge(add_peak, **wedgeprops)
 
     def on_remove_active_peak(self, *_args):

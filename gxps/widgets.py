@@ -506,6 +506,13 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
         self.mode_label = self.message
         self.xy_label = builder.get_object("mpl_coord_label")
         canvas = builder.get_object("main_canvas")
+        self.toggle_buttons = {
+            "Add region": builder.get_object("region_add_button"),
+            "Remove region": builder.get_object("region_remove_button"),
+            "Add peak": builder.get_object("peak_add_button"),
+            "Pan / Zoom": builder.get_object("mpl_pan_button"),
+            "Zoom Rectangle": builder.get_object("mpl_zoom_button")
+        }
         super().__init__(canvas, None)
 
         self.span_selector = SpanSelector(
@@ -540,6 +547,14 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
     def set_history_buttons(self):
         """Same as above, this prevents the use of self._gtk_ids."""
 
+    def untoggle_buttons(self, exclude=None):
+        """Untoggles all buttons (exclude the one given by its label)."""
+        if exclude is None:
+            exclude = []
+        for label, button in self.toggle_buttons.items():
+            if label not in exclude:
+                button.set_active(False)
+
     def disable_tools(self):
         """Release widgetlock and disconnect all signals associated with
         native matplotlib toolbar tools.
@@ -551,10 +566,26 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
 
         self._active = None
         self.mode = ""
+        self.untoggle_buttons()
         self.release_all_tools()
         for ax in self.canvas.figure.get_axes():
             ax.set_navigate_mode(self._active)
         self.set_message(self.mode)
+
+    def release_all_tools(self):
+        """Release all tools used in this class from self.canvas.widgetlock
+        because the locks have different owners.
+        """
+        try:
+            self.canvas.widgetlock.release(self)
+        except ValueError:
+            try:
+                self.canvas.widgetlock.release(self.span_selector)
+            except ValueError:
+                try:
+                    self.canvas.widgetlock.release(self.peak_selector)
+                except ValueError:
+                    self.canvas.widgetlock.release(self.point_selector)
 
     def get_point(self, callback, onmove_callback=None):
         """Gets a x, y point on the canvas and then calls
@@ -568,7 +599,7 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
             self._idRelease = self.canvas.mpl_disconnect(self._idRelease)
             self.mode = ""
 
-        mode = callback.__doc__
+        mode = "Remove region"
 
         self.release_all_tools()
         if self._active == mode:
@@ -580,6 +611,7 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
 
         self._active = mode
         self.mode = mode
+        self.untoggle_buttons(exclude=[mode])
         self.canvas.widgetlock(self.point_selector)
         for ax in self.canvas.figure.get_axes():
             ax.set_navigate_mode(None)
@@ -589,6 +621,7 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
             """Callback caller."""
             self._active = None
             self.mode = ""
+            self.untoggle_buttons()
             self.point_selector.active = False
             self.release_all_tools()
             self.set_message(self.mode)
@@ -610,7 +643,7 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
             self._idRelease = self.canvas.mpl_disconnect(self._idRelease)
             self.mode = ""
 
-        mode = callback.__doc__
+        mode = "Add region"
 
         self.release_all_tools()
         if self._active == mode:
@@ -622,6 +655,7 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
 
         self._active = mode
         self.mode = mode
+        self.untoggle_buttons(exclude=[mode])
         self.canvas.widgetlock(self.span_selector)
         for ax in self.canvas.figure.get_axes():
             ax.set_navigate_mode(None)
@@ -631,6 +665,7 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
             """Callback caller."""
             self._active = None
             self.mode = ""
+            self.untoggle_buttons()
             self.span_selector.active = False
             self.release_all_tools()
             self.set_message(self.mode)
@@ -659,7 +694,7 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
             self._idRelease = self.canvas.mpl_disconnect(self._idRelease)
             self.mode = ""
 
-        mode = callback.__doc__
+        mode = "Add peak"
 
         self.release_all_tools()
         if self._active == mode:
@@ -671,6 +706,7 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
 
         self._active = mode
         self.mode = mode
+        self.untoggle_buttons(exclude=[mode])
         self.canvas.widgetlock(self.peak_selector)
         for ax in self.canvas.figure.get_axes():
             ax.set_navigate_mode(None)
@@ -680,6 +716,7 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
             """Callback caller."""
             self._active = None
             self.mode = ""
+            self.untoggle_buttons()
             self.peak_selector.active = False
             self.release_all_tools()
             self.set_message(self.mode)
@@ -717,13 +754,22 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
         if self._idRelease is not None:
             self._idRelease = self.canvas.mpl_disconnect(self._idRelease)
             self.mode = ''
+
+        mode = "Pan / Zoom"
         self.release_all_tools()        # changed here
+        self.untoggle_buttons(exclude=[mode])
+
+        def local_release_pan(*args, **kwargs):
+            """Use the super release_pan, but also untoggle the button."""
+            self.release_pan(*args, **kwargs)
+            self.untoggle_buttons()
+
         if self._active:
             self._idPress = self.canvas.mpl_connect(
                 'button_press_event', self.press_pan)
             self._idRelease = self.canvas.mpl_connect(
-                'button_release_event', self.release_pan)
-            self.mode = 'Pan / Zoom'
+                'button_release_event', local_release_pan)
+            self.mode = mode
             self.canvas.widgetlock(self)
         for ax in self.canvas.figure.get_axes():
             ax.set_navigate_mode(self._active)
@@ -743,13 +789,22 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
         if self._idRelease is not None:
             self._idRelease = self.canvas.mpl_disconnect(self._idRelease)
             self.mode = ''
+
+        mode = "Zoom Rectangle"
         self.release_all_tools()        # changed here
+        self.untoggle_buttons(exclude=[mode])
+
+        def local_release_zoom(*args, **kwargs):
+            """Use the super release_zoom, but also untoggle the button."""
+            self.release_zoom(*args, **kwargs)
+            self.untoggle_buttons()
+
         if self._active:
             self._idPress = self.canvas.mpl_connect(
                 'button_press_event', self.press_zoom)
             self._idRelease = self.canvas.mpl_connect(
-                'button_release_event', self.release_zoom)
-            self.mode = 'Zoom Rectangle'
+                'button_release_event', local_release_zoom)
+            self.mode = mode
             self.canvas.widgetlock(self)
         for ax in self.canvas.figure.get_axes():
             ax.set_navigate_mode(self._active)
@@ -778,23 +833,9 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
         """Centers view and disables navbar tools.
         """
         self.disable_tools()
+        self.untoggle_buttons()
         self.canvas.center_view()
         self.canvas.draw_idle()
-
-    def release_all_tools(self):
-        """Release all tools used in this class from self.canvas.widgetlock
-        because the locks have different owners.
-        """
-        try:
-            self.canvas.widgetlock.release(self)
-        except ValueError:
-            try:
-                self.canvas.widgetlock.release(self.span_selector)
-            except ValueError:
-                try:
-                    self.canvas.widgetlock.release(self.peak_selector)
-                except ValueError:
-                    self.canvas.widgetlock.release(self.point_selector)
 
     def mouse_move(self, event):
         self._set_cursor(event)

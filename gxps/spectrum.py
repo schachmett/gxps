@@ -263,7 +263,6 @@ class Spectrum(Observable, MetaDataContainer):
             raise ValueError("Background bounds must be pairwise.")
         if not any(value):
             self._background_bounds = np.array([])
-            self.background_type = self._background_type
         for bound in value:
             if bound > self.energy.max() or bound < self.energy.min():
                 raise ValueError("Background bound out of energy range.")

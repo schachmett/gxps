@@ -515,7 +515,7 @@
                           </packing>
                         </child>
                         <child>
-                          <object class="GtkToolButton" id="mpl_pan_button">
+                          <object class="GtkToggleToolButton" id="mpl_pan_button">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
                             <property name="action_name">app.pan-plot</property>
@@ -529,7 +529,7 @@
                           </packing>
                         </child>
                         <child>
-                          <object class="GtkToolButton" id="mpl_zoom_button">
+                          <object class="GtkToggleToolButton" id="mpl_zoom_button">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
                             <property name="action_name">app.zoom-plot</property>
@@ -688,7 +688,7 @@
                           </packing>
                         </child>
                         <child>
-                          <object class="GtkButton" id="region_add_button">
+                          <object class="GtkToggleButton" id="region_add_button">
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">True</property>
@@ -703,7 +703,7 @@
                           </packing>
                         </child>
                         <child>
-                          <object class="GtkButton" id="region_remove_button">
+                          <object class="GtkToggleButton" id="region_remove_button">
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">True</property>
@@ -773,7 +773,7 @@
                           </packing>
                         </child>
                         <child>
-                          <object class="GtkButton" id="peak_add_button">
+                          <object class="GtkToggleButton" id="peak_add_button">
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">True</property>
