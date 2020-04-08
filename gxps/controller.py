@@ -55,6 +55,7 @@ class Help(Operator):
         """Show 'About' dialog."""
         dialog = self.get_widget("about_dialog")
         dialog.run()
+        LOG.debug("Showing 'About' window")
         dialog.hide()
 
 
@@ -70,6 +71,7 @@ class File(Operator):
                 self.new()
         else:
             self.new()
+        self.bus.fire()
 
     def new(self):
         """Make new project."""
@@ -84,6 +86,7 @@ class File(Operator):
         if self.state.project_isaltered:
             return
         self.new()
+        self.bus.fire()
 
     def open(self, fname, merge=False):
         """Load project file."""
@@ -116,6 +119,7 @@ class File(Operator):
             CONFIG["IO"]["project-dir"] = dialog.get_current_folder()
             self.open(fname)
         dialog.hide()
+        self.bus.fire()
 
     def on_merge(self, *_args):
         """Merges a project file into the current project."""
@@ -128,6 +132,7 @@ class File(Operator):
             CONFIG["IO"]["project-dir"] = dialog.get_current_folder()
             self.open(fname, merge=True)
         dialog.hide()
+        self.bus.fire()
 
     def on_import(self, *_args):
         """Imports spectra from a data file."""
@@ -144,6 +149,7 @@ class File(Operator):
                 spectrum = self.data.add_spectrum(**specdict)
                 spectrum.register_queue(self.bus)
         dialog.hide()
+        self.bus.fire()
 
     def ask_for_save(self):
         """Opens a AskForSaveDialog and then either saves the file or,
@@ -160,6 +166,7 @@ class File(Operator):
             self.state.project_isaltered = False
         else:
             dialog.hide()
+        self.bus.fire()
 
     def save(self, fname):
         """Saves project file."""
@@ -174,6 +181,7 @@ class File(Operator):
             self.on_save_as()
         else:
             self.save(self.state.current_project)
+        self.bus.fire()
 
     def on_save_as(self, *_args):
         """Saves the current project as a new file."""
@@ -187,6 +195,7 @@ class File(Operator):
             CONFIG["IO"]["project-dir"] = dialog.get_current_folder()
             self.save(fname)
         dialog.hide()
+        self.bus.fire()
 
     def on_export_txt(self, *_args):
         """Exports the currently selected spectra and their fits to an ASCII
@@ -205,6 +214,7 @@ class File(Operator):
                 gxps.io.export_txt(fname, spectrum)
         CONFIG["IO"]["project-dir"] = dialog.get_current_folder()
         dialog.hide()
+        self.bus.fire()
 
     def on_export_image(self, *_args):
         """Exports the image currently displayed on the exporting canvas.
@@ -262,6 +272,7 @@ class Edit(Operator):
         spectra = self.state.selected_spectra
         for spectrum in spectra:
             self.data.remove_spectrum(spectrum)
+        self.bus.fire()
 
     def on_edit_spectra(self, *_args):
         """Opens an 'Edit' dialog for selected spectra."""
@@ -278,6 +289,7 @@ class Edit(Operator):
                     spectrum.set_meta(attr, value)
         dialog.hide()
         self.state.editing_spectra = []
+        self.bus.fire()
 
     def on_calibrate(self, *_args):
         """Changes the calibration for selected spectra."""
@@ -285,6 +297,7 @@ class Edit(Operator):
         calibration = float(adjustment.get_value())
         for spectrum in self.state.active_spectra:
             spectrum.energy_calibration = calibration
+        self.bus.fire()
 
     def on_normalize(self, *_args):
         """Changes the normalization for selected spectra."""
@@ -295,6 +308,7 @@ class Edit(Operator):
         norm_type = self.state.titles["norm_type_ids"].inverse[normid]
         for spectrum in self.state.active_spectra:
             spectrum.normalization_type = norm_type
+        self.bus.fire()
 
     def on_normalize_manual(self, *_args):
         """Changes the normalization divisor directly."""
@@ -303,6 +317,7 @@ class Edit(Operator):
             if spectrum.normalization_type != "manual":
                 raise ValueError("Normalization is not set to manual")
             spectrum.normalization_divisor = 1 / float(entry.get_text())
+        self.bus.fire()
 
     def on_change_bg(self, *_args):
         """Changes the background type."""
@@ -316,6 +331,7 @@ class Edit(Operator):
         bg_type = self.state.titles["background_type_ids"].inverse[bgid]
         for spectrum in active_spectra:
             spectrum.background_type = bg_type
+        self.bus.fire()
 
 
 class Fit(Operator):
@@ -329,11 +345,11 @@ class Fit(Operator):
             for spectrum in self.state.active_spectra:
                 spectrum.background_type = "shirley"
                 spectrum.add_background_bounds(emin, emax)
+            self.bus.fire()
         spanprops = {"edgecolor": COLORS["Plotting"]["region-vlines"], "lw": 2}
         navbar.get_span(add_region, **spanprops)
 
-    @staticmethod
-    def on_change_region(event):
+    def on_change_region(self, event):
         """Set a new region boundary."""
         if "release" not in event.properties["attr"]:
             return
@@ -348,6 +364,7 @@ class Fit(Operator):
             if old_value == upper:
                 spectrum.remove_background_bounds(lower, upper)
                 spectrum.add_background_bounds(lower, new_value)
+        self.bus.fire()
 
     def on_remove_region(self, *_args):
         """Remove selected region."""
@@ -362,6 +379,7 @@ class Fit(Operator):
                         spectrum.remove_background_bounds(lower, upper)
                 if not any(spectrum.background_bounds):
                     spectrum.background_type = "none"
+            self.bus.fire()
         navbar.get_point(remove_region)
 
     def on_add_peak(self, *_args):
@@ -377,6 +395,7 @@ class Fit(Operator):
                 peak = spectrum.add_peak(name, position=position, angle=angle,
                                          height=height, shape=shape)
                 peak.register_queue(self.bus)
+            self.bus.fire()
         wedgeprops = {}
         navbar.get_wedge(add_peak, **wedgeprops)
 
@@ -385,6 +404,7 @@ class Fit(Operator):
         for peak in self.state.active_peaks:
             self.state.peak_names.remove(peak.name)
             peak.spectrum.remove_peak(peak)
+        self.bus.fire()
 
     def on_clear_peaks(self, *_args):
         """Remove all peaks from active spectra."""
@@ -393,6 +413,7 @@ class Fit(Operator):
             for peak in spectrum.peaks:
                 self.state.peak_names.remove(peak.name)
                 spectrum.remove_peak(peak.name)
+        self.bus.fire()
 
     def on_peak_entry_activate(self, *_args):
         """Change the active peak's parameters."""
@@ -416,6 +437,7 @@ class Fit(Operator):
             peak.set_constraint(**constraint)
         model_combo = self.get_widget("peak_model_combo")
         peak.shape = peak.shapes[model_combo.get_active()]
+        self.bus.fire()
 
     def on_peak_model_changed(self, *_args):
         """Change the model of the active peak."""
@@ -426,6 +448,7 @@ class Fit(Operator):
         model_combo = self.get_widget("peak_model_combo")
         shape = model_combo.get_active_text()
         peak.shape = shape
+        self.bus.fire()
 
     def on_peak_name_entry_changed(self, *_args):
         """Change the active peak's name."""
@@ -436,12 +459,14 @@ class Fit(Operator):
         name_entry = self.get_widget("peak_name_entry")
         name = name_entry.get_text()
         peak.label = name
+        self.bus.fire()
 
     def on_fit(self, *_args):
         """Do the fucking fitting."""
         active_spectra = self.state.active_spectra
         for spectrum in active_spectra:
             spectrum.do_fit()
+        self.bus.fire()
 
     @staticmethod
     def parse_peak_entry(param_string):
@@ -470,6 +495,7 @@ class ViewC(Operator):
         """Callback for showing all selected spectra."""
         spectra = self.state.selected_spectra
         self.state.active_spectra = spectra
+        self.bus.fire()
 
     def on_spectrum_view_row_activated(self, treeview, path, _col):
         """Callback for row activation by Enter key or double click."""
@@ -477,6 +503,7 @@ class ViewC(Operator):
         iter_ = model.get_iter(path)
         spectrum = model.get(iter_, 0)[0]
         self.state.active_spectra = [spectrum]
+        self.bus.fire()
 
     def on_spectrum_view_clicked(self, treeview, event):
         """Callback for button-press-event, popups the menu on right click.
@@ -502,6 +529,7 @@ class ViewC(Operator):
             combo.get_active_text(),
             entry.get_text()
         )
+        self.bus.fire()
 
     def on_peak_view_row_activated(self, treeview, path, _col):
         """Callback for row activation by Enter key or single click."""
@@ -509,6 +537,7 @@ class ViewC(Operator):
         iter_ = model.get_iter(path)
         peak = model.get(iter_, 0)[0]
         self.state.active_peaks = [peak]
+        self.bus.fire()
 
     def on_show_rsfs(self, *_args):
         """Opens an RSF dialog."""
@@ -525,6 +554,7 @@ class ViewC(Operator):
         elif response == Gtk.ResponseType.REJECT:
             self.state.rsf_elements = []
         dialog.hide()
+        self.bus.fire()
 
     def on_center_plot(self, *_args):
         """Centers the plot via the navbar command."""

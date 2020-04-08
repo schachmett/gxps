@@ -14,6 +14,7 @@ class CommandSender:
     # pylint: disable=too-many-instance-attributes
     def __init__(self, bus, data, state, get_widget):
         self.bus = bus
+        self.bus.set_policy("accumulate")
         self.data = data
         self.state = state
         self.get_widget = get_widget
@@ -96,7 +97,8 @@ class CommandSender:
             return False
         do_func = self.callbacks[key]
         command = Command(do_func)
-        return self.history.do_command(command, *args[:-1])
+        rval = self.history.do_command(command, *args[:-1])
+        return rval
 
     def callback(self, *_args):
         """Manages observer-style subscriptions."""

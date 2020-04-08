@@ -171,7 +171,7 @@ class EventBus:
         """Fires all accumulated events of given signal.
         """
         if signal == "all":
-            for specific_signal in self._queue:
+            for specific_signal in self._queue.copy():
                 if specific_signal == "all":
                     continue
                 self.fire(specific_signal)
@@ -265,8 +265,6 @@ class Observable:
         """Registers a queue where events are sent to.
         """
         self._queues.append(queue)
-        # TODO breaks older version
-        # self.emit("registered-observable")
         LOG.debug("{} registered to queue {}".format(self, queue))
 
     def register_children_to_queue(self, queue):
