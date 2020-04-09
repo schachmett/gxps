@@ -14,7 +14,6 @@ from gi.repository import Gtk, Pango, GLib
 from gxps import __appname__
 from gxps.config import COLORS
 from gxps.io import get_element_rsfs
-from gxps.spectrum import Peak
 
 
 LOG = logging.getLogger(__name__)
@@ -302,12 +301,24 @@ class SpectraPanel(View):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         tvmenu = self.get_widget("spectrum_view_context_menu")
         treeview = self.get_widget("spectrum_view")
         tvmenu.attach_to_widget(treeview, None)
         norm_combo = self.get_widget("normalization_combo")
+        norm_combo.remove_all()
+        for norm_type in self.state.titles["norm_types"]:
+            norm_id = self.state.titles["norm_type_ids"][norm_type]
+            norm_title = self.state.titles["norm_types"][norm_type]
+            norm_combo.insert(-1, norm_id, norm_title)
         renderer = norm_combo.get_cells()[0]
         renderer.set_property("width-chars", 10)
+        bg_type_combo = self.get_widget("region_background_type_combo")
+        bg_type_combo.remove_all()
+        for bg_type in self.state.titles["background_types"]:
+            bg_type_id = self.state.titles["background_type_ids"][bg_type]
+            bg_type_title = self.state.titles["background_types"][bg_type]
+            bg_type_combo.insert(-1, bg_type_id, bg_type_title)
         self._make_columns()
         self._setup_filter()
 
@@ -480,10 +491,13 @@ class PeakPanel(View):
         shape_combo.remove_all()
         model_combo = self.get_widget("peak_model_combo")
         model_combo.remove_all()
-        for shape in Peak.shapes:
-            shape_combo.append_text(shape)
-            model_combo.append_text(shape)
+        for shape in self.state.titles["peak_shapes"]:
+            shape_id = self.state.titles["peak_shape_ids"][shape]
+            shape_title = self.state.titles["peak_shapes"][shape]
+            shape_combo.insert(-1, shape_id, shape_title)
+            model_combo.insert(-1, shape_id, shape_title)
         shape_combo.set_active(0)
+
         self._make_columns()
 
     def update_data(self, _event):
@@ -566,9 +580,10 @@ class PeakPanel(View):
                 entries[par].set_sensitive(False)
                 labels[par].set_text("")
 
-        for i, shape in enumerate(Peak.shapes):
+        # for i, shape in enumerate(Peak.shapes):
+        for shape, shape_id in self.state.titles["peak_shape_ids"].items():
             if shape == peak.shape:
-                model_combo.set_active(i)
+                model_combo.set_active_id(shape_id)
         model_combo.set_sensitive(True)
 
 

@@ -55,7 +55,6 @@ class CommandSender:
             "remove-region": self._fit.on_remove_region,
             "clear-regions": lambda *x: None,
             "add-peak": self._fit.on_add_peak,
-            "add-guessed-peak": lambda *x: None,
             "remove-peak": self._fit.on_remove_active_peak,
             "clear-peaks": self._fit.on_clear_peaks,
             "fit": self._fit.on_fit,

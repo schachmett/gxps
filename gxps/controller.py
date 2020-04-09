@@ -446,7 +446,8 @@ class Fit(Operator):
             return
         peak = active_peaks[0]
         model_combo = self.get_widget("peak_model_combo")
-        shape = model_combo.get_active_text()
+        shape_id = model_combo.get_active_id()
+        shape = self.state.titles["peak_shape_ids"].inverse[shape_id]
         peak.shape = shape
         self.bus.fire()
 

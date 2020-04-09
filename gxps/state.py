@@ -86,6 +86,16 @@ class State(Observable):
         "photon_source_ids": OrderedBidict({
             "Al": "0",
             "Mg": "1"
+        }),
+        "peak_shapes": OrderedBidict({
+            "PseudoVoigt": "PseudoVoigt",
+            "Voigt": "Voigt",
+            "DoniachSunjic": "DoniachSunjic"
+        }),
+        "peak_shape_ids": OrderedBidict({
+            "PseudoVoigt": "0",
+            "Voigt": "1",
+            "DoniachSunjic": "2"
         })
     }
 

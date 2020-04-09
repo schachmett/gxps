@@ -1,7 +1,13 @@
+* write tests
+* add background types
+
 Low priority:
+* move state.titles to a designated module
 * rehaul background bounds
+* replace pbr dependency by importlib.metadata (requires higher python3 version)
 * fine tune bus priority and event checking
 * make detailed signals instead of putting everything in event properties
+* use f-string interpolation (requires python3.6)
 
 Unclear if doable:
 * make emitting signals a decorator
@@ -9,3 +15,4 @@ Unclear if doable:
 
 Unclear if it provides an advantage
 * abolish the CONFIG, COLORS and dunder singletons
+* use type annotations

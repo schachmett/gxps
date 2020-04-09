@@ -81,8 +81,8 @@ class Spectrum(Observable, MetaDataContainer):
     """
     _signals = ("changed-spectrum", "changed-spectrum-meta")
     _required = ("energy", "intensity", "name", "filename", "notes")
-    _bg_types = ("none", "linear", "shirley", "tougaard")
-    _norm_types = ("none", "highest", "high_energy", "low_energy", "manual")
+    bg_types = ("none", "linear", "shirley", "tougaard")
+    norm_types = ("none", "highest", "high_energy", "low_energy", "manual")
 
     def __init__(self, **kwargs):
         if not all(a in kwargs for a in self._required):
@@ -170,10 +170,10 @@ class Spectrum(Observable, MetaDataContainer):
 
     @normalization_type.setter
     def normalization_type(self, value):
-        """Normalization type has to be in self._norm_types."""
+        """Normalization type has to be in self.norm_types."""
         if self._normalization_type == value:
             return
-        if value not in self._norm_types:
+        if value not in self.norm_types:
             raise ValueError("Invalid normalization type '{}'".format(value))
         self._normalization_type = value
         if self._normalization_type != "manual":
@@ -233,8 +233,8 @@ class Spectrum(Observable, MetaDataContainer):
 
     @background_type.setter
     def background_type(self, value):
-        """Only values from self._bg_types are valid."""
-        if value not in self._bg_types:
+        """Only values from self.bg_types are valid."""
+        if value not in self.bg_types:
             raise ValueError("Background type {} not valid".format(value))
         if self._background_type == value:
             return
@@ -297,8 +297,8 @@ class ModeledSpectrum(Spectrum):
     """
     _signals = ("changed-fit", "changed-spectrum", "changed-spectrum-meta")
     _required = ("energy", "intensity", "name", "filename", "notes")
-    _bg_types = ("none", "linear", "shirley", "tougaard")
-    _norm_types = ("none", "manual", "highest", "high_energy", "low_energy")
+    bg_types = ("none", "linear", "shirley", "tougaard")
+    norm_types = ("none", "manual", "highest", "high_energy", "low_energy")
 
     def __init__(self, *args, **kwargs):
         self.params = Parameters()
