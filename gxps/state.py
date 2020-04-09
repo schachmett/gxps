@@ -8,10 +8,8 @@ GTK classes representing data from a SpectrumContainer and the GUI state.
 import logging
 import string
 
-from bidict import OrderedBidict
-
-from gxps.config import CONFIG
-from gxps.utility import Observable #, EventQueue
+from gxps.config import CONFIG, TITLES
+from gxps.utility import Observable
 
 
 LOG = logging.getLogger(__name__)
@@ -33,71 +31,7 @@ class State(Observable):
         *list(string.ascii_uppercase),
         *[i+b for i in string.ascii_uppercase for b in string.ascii_uppercase]
     ]
-    titles = {
-        "spectrum_view": OrderedBidict({
-            "name": "Name",
-            "notes": "Notes"
-        }),
-        "peak_view": OrderedBidict({
-            "label": "Label",
-            "name": "     ",
-            "shape": "Shape",
-            "position": "Position",
-            "area": "Area*",
-            "fwhm": "FWHM*",
-            "alpha": "Par1",
-            "beta": "Par2",
-            "gamma": "Par3"
-        }),
-        "static_specinfo": OrderedBidict({
-            "filename": "Filename"
-        }),
-        "editing_dialog": OrderedBidict({
-            "name": "Name",
-            "notes": "Notes",
-            "pass_energy": "Pass Energy",
-            "integration_time": "Time per Data Point",
-            "sweeps": "Sweeps"
-        }),
-        "norm_types": OrderedBidict({
-            "none": "none",
-            "manual": "manual",
-            "high_energy": "high energy background",
-            "low_energy": "low energy background",
-            "highest": "highest peak"
-        }),
-        "norm_type_ids": OrderedBidict({
-            "none": "0",
-            "highest": "1",
-            "high_energy": "2",
-            "low_energy": "3",
-            "manual": "4"
-        }),
-        "background_types": OrderedBidict({
-            "none": "none",
-            "shirley": "Shirley",
-            "linear": "Linear"
-        }),
-        "background_type_ids": OrderedBidict({
-            "none": "0",
-            "shirley": "1",
-            "linear": "2"
-        }),
-        "photon_source_ids": OrderedBidict({
-            "Al": "0",
-            "Mg": "1"
-        }),
-        "peak_shapes": OrderedBidict({
-            "PseudoVoigt": "PseudoVoigt",
-            "Voigt": "Voigt",
-            "DoniachSunjic": "DoniachSunjic"
-        }),
-        "peak_shape_ids": OrderedBidict({
-            "PseudoVoigt": "0",
-            "Voigt": "1",
-            "DoniachSunjic": "2"
-        })
-    }
+    titles = TITLES
 
     def __init__(self, app, spectra):
         self._app = app
@@ -111,13 +45,17 @@ class State(Observable):
         self._current_project = ""
         self._project_isaltered = False
         # Spectrum Treeview-related
-        self._spectra_tv_columns = ["name", "notes"]
+        self._spectra_tv_columns = [
+            self.titles["spectrum_view"].inverse[title.strip()]
+            for title in CONFIG["View"]["spectrum-table"].split(",")
+        ]
         self._spectra_tv_filter = ["notes", None]
         # Peak Trewwvie-related
-        self._peak_tv_columns = [
-            "name", "label", "position", "fwhm", "area",
-            "alpha"
-        ]
+        self._peak_tv_columns = ["name"]
+        self._peak_tv_columns.extend([
+            self.titles["peak_view"].inverse[title.strip()]
+            for title in CONFIG["View"]["peak-table"].split(",")
+        ])
         # Plotting-related
         self._rsf_elements = [""]
         self._photon_source = "Al"
