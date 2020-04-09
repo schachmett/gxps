@@ -82,7 +82,7 @@ class State(Observable):
             "changed-peak-meta"
         )
         for signal in signals:
-            self._app.bus.subscribe(self.alter_project, signal, priority=10)
+            self._app.bus.subscribe(self.alter_project, signal, priority=0)
 
         super().__init__()
 

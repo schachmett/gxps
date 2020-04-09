@@ -171,10 +171,21 @@ class EventBus:
         """Fires all accumulated events of given signal.
         """
         if signal == "all":
-            for specific_signal in self._queue.copy():
-                if specific_signal == "all":
+            cbs = []
+            for _signal in self._queue.copy():
+                if (_signal == "all"
+                        or _signal not in self._queue
+                        or not self._queue[_signal]
+                        or _signal not in self._subscribers
+                        or not self._subscribers[_signal]
+                   ):
                     continue
-                self.fire(specific_signal)
+                event_list = EventList(self._queue[_signal])
+                self._queue[_signal].clear()
+                for callback, prio in self._subscribers[_signal]:
+                    cbs.append((prio, callback, event_list))
+            for _, callback, event_list in sorted(cbs, key=lambda x: x[0]):
+                callback(event_list)
         else:
             if signal not in self._queue or not self._queue[signal]:
                 return
