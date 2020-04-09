@@ -42,7 +42,7 @@ class ViewManager():
         window = Window(self.get_widget, self.state, self.data)
         signals = ("changed-project", )
         for signal in signals:
-            self.bus.subscribe(window.update_titlebar, signal)
+            self.bus.subscribe(window.update_titlebar, signal, priority=0)
         return window
 
     def _instantiate_plot(self):
@@ -51,7 +51,7 @@ class ViewManager():
         signals = ("changed-active", "changed-rsf", "changed-spectrum",
                    "changed-fit", "changed-peak")
         for signal in signals:
-            self.bus.subscribe(plot.update, signal, priority=10)
+            self.bus.subscribe(plot.update, signal, priority=2)
         return plot
 
     def _instantiate_spectra_panel(self):
@@ -165,6 +165,9 @@ class Plot(View):
                     keepaxes = False
         if event.signal == "changed-active":
             keepaxes = False
+        self._update(keepaxes)
+
+    def _update(self, keepaxes=True):
         # Save axis limits if needed, wipe the canvas and prepare for new
         # centering axis limits.
         if keepaxes:

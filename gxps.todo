@@ -1,3 +1,7 @@
+* handle bright mode / dark mode
+* improve plot update handling
+* make plot customisable
+* show residuals
 * write tests
 * add background types
 * improve image export

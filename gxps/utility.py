@@ -172,6 +172,7 @@ class EventBus:
         """
         if signal == "all":
             cbs = []
+            _signals = []
             for _signal in self._queue.copy():
                 if (_signal == "all"
                         or _signal not in self._queue
@@ -180,11 +181,19 @@ class EventBus:
                         or not self._subscribers[_signal]
                    ):
                     continue
+                _signals.append(_signal)
                 event_list = EventList(self._queue[_signal])
                 self._queue[_signal].clear()
                 for callback, prio in self._subscribers[_signal]:
                     cbs.append((prio, callback, event_list))
-            for _, callback, event_list in sorted(cbs, key=lambda x: x[0]):
+            if not cbs:
+                return
+            LOG.debug(f"Firing signals {_signals}")
+            for prio, callback, event_list in sorted(cbs, key=lambda x: -x[0]):
+                LOG.debug(
+                    f"Signal '{event_list.signal}' calls {callback}"
+                    f"with prio {prio}"
+                )
                 callback(event_list)
         else:
             if signal not in self._queue or not self._queue[signal]:

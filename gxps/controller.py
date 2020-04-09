@@ -100,6 +100,7 @@ class File(Operator):
                 peak.register_queue(self.bus)
         if not merge:
             self.state.active_spectra = [spectra[idx] for idx in active_idxs]
+            self.bus.fire()
             self.state.current_project = fname
         LOG.info("Opened project file '{}'".format(fname))
 
@@ -408,7 +409,6 @@ class Fit(Operator):
 
     def on_clear_peaks(self, *_args):
         """Remove all peaks from active spectra."""
-        # with EventQueue("combine-all"):
         for spectrum in self.state.selected_spectra:
             for peak in spectrum.peaks:
                 self.state.peak_names.remove(peak.name)
@@ -437,7 +437,7 @@ class Fit(Operator):
             constraint["param_alias"] = attr
             constraints.append(constraint)
         for constraint in constraints:
-            peak.set_constraint(**constraint)
+            peak.set_constraints(**constraint)
         self.bus.fire()
 
     def on_peak_model_changed(self, *_args):

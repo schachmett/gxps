@@ -557,7 +557,7 @@ class Peak(Observable):
             intensity = self._model.eval(params=self.params, x=energy)
         return intensity
 
-    def set_constraint(
+    def set_constraints(
             self, param_alias,
             value=None, vary=None, min=0, max=np.inf, expr=""
         ):
@@ -681,12 +681,12 @@ class Peak(Observable):
             area["value"], fwhm["value"], position["value"],
             alpha["value"], beta["value"], gamma["value"]
         )
-        self.set_constraint("fwhm", **fwhm)
-        self.set_constraint("area", **area)
-        self.set_constraint("position", **position)
-        self.set_constraint("alpha", **alpha)
-        self.set_constraint("beta", **beta)
-        self.set_constraint("gamma", **gamma)
+        self.set_constraints("fwhm", **fwhm)
+        self.set_constraints("area", **area)
+        self.set_constraints("position", **position)
+        self.set_constraints("alpha", **alpha)
+        self.set_constraints("beta", **beta)
+        self.set_constraints("gamma", **gamma)
         self.emit("changed-peak")
 
     def get_area(self):

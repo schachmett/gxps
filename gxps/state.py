@@ -70,7 +70,7 @@ class State(Observable):
         }
         # Keep the active spectra up to date
         self._app.bus.subscribe(
-            self.update_active, "changed-spectra", priority=0)
+            self.update_active, "changed-spectra", priority=9)
         self._app.bus.subscribe(
             self.update_active, "changed-fit", priority=0)
         signals = (
@@ -82,7 +82,7 @@ class State(Observable):
             "changed-peak-meta"
         )
         for signal in signals:
-            self._app.bus.subscribe(self.alter_project, signal, priority=0)
+            self._app.bus.subscribe(self.alter_project, signal, priority=10)
 
         super().__init__()
 
@@ -235,16 +235,12 @@ class State(Observable):
         if value == "Untitled" or not value:
             self._current_project = "Untitled"
             CONFIG["IO"]["current-project"] = ""
-            self._project_isaltered = False
             self.emit("changed-project", attr="filename")
         elif value != self._current_project:
             self._current_project = value
             CONFIG["IO"]["current-project"] = value
-            self._project_isaltered = False
             self.emit("changed-project", attr="filename")
-        else:
-            self._project_isaltered = False
-            self.emit("changed-project", attr="filename")
+        self._project_isaltered = False
 
     @property
     def project_isaltered(self):

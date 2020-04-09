@@ -94,6 +94,7 @@ class CommandSender:
         if key not in self.callbacks:
             LOG.warning("Action/Handler {} does not exist".format(key))
             return False
+        LOG.debug(f"Executing command {key}")
         do_func = self.callbacks[key]
         command = Command(do_func)
         rval = self.history.do_command(command, *args[:-1])
