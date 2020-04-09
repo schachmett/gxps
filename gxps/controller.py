@@ -417,6 +417,9 @@ class Fit(Operator):
 
     def on_peak_entry_activate(self, *_args):
         """Change the active peak's parameters."""
+        self.bus.set_policy("ignore")
+        self.on_peak_model_changed()
+        self.bus.set_policy("accumulate")
         active_peaks = self.state.active_peaks
         if len(active_peaks) != 1:
             return
@@ -435,8 +438,6 @@ class Fit(Operator):
             constraints.append(constraint)
         for constraint in constraints:
             peak.set_constraint(**constraint)
-        model_combo = self.get_widget("peak_model_combo")
-        peak.shape = peak.shapes[model_combo.get_active()]
         self.bus.fire()
 
     def on_peak_model_changed(self, *_args):

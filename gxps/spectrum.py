@@ -430,6 +430,13 @@ class Peak(Observable):
         "beta": 0,
         "gamma": 0
     }
+    _default_constraints = {
+        "value": None,
+        "vary": True,
+        "min": 0,
+        "max": np.inf,
+        "expr": ""
+    }
     shapes = ["PseudoVoigt", "DoniachSunjic", "Voigt"]
 
     def __init__(
@@ -465,19 +472,19 @@ class Peak(Observable):
             if alpha is None:
                 alpha = 0.5
             self._model = PseudoVoigtModel(prefix="{}_".format(self.name))
-            self._model.set_param_hint("fraction", vary=False, value=alpha)
+            self._model.set_param_hint("fraction", min=0, value=alpha)
         elif self._shape == "DoniachSunjic":
             self.param_aliases["alpha"] = "asym"
             if alpha is None:
                 alpha = 0.1
             self._model = DoniachSunjicModel(prefix="{}_".format(self.name))
-            self._model.set_param_hint("asym", vary=False, value=alpha)
+            self._model.set_param_hint("asym", min=0, value=alpha)
         elif self._shape == "Voigt":
             self.param_aliases["alpha"] = "fwhm_l"
             if alpha is None:
                 alpha = 0.5
             self._model = VoigtModel(prefix="{}_".format(self.name))
-            self._model.set_param_hint("fwhm_l", vary=False, value=alpha)
+            self._model.set_param_hint("fwhm_l", min=0, value=alpha)
         else:
             if "" in (beta, gamma, ):
                 pass #only for linter
@@ -485,8 +492,8 @@ class Peak(Observable):
 
         self.params += self._model.make_params()
         self.get_param("fwhm").set(value=abs(fwhm), min=0, vary=True)
-        self.get_param("amplitude").set(value=abs(area), min=0)
-        self.get_param("center").set(value=abs(position), min=0)
+        self.get_param("amplitude").set(value=abs(area), min=0, vary=True)
+        self.get_param("center").set(value=abs(position), min=0, vary=True)
         # if self._shape == "PseudoVoigt":
         #     self.get_param("sigma").set(expr="{}_fwhm/2".format(self.name))
 
@@ -552,45 +559,46 @@ class Peak(Observable):
 
     def set_constraint(
             self, param_alias,
-            value=None, vary=None, min=None, max=None, expr=None
+            value=None, vary=None, min=0, max=np.inf, expr=""
         ):
         """Sets a constraint for param. None values will unset the constraint.
         """
         # pylint: disable=too-many-arguments
         # pylint: disable=redefined-builtin
-        param = self.get_param(param_alias)
-        old_par = self.get_constraints(param_alias)
-
-        for arg in (value, vary, min, max):
-            try:
-                # fail if x is not in (None, number)
-                if arg and abs(arg) > -1:
-                    pass
-            except TypeError:
-                LOG.warning("Invalid constraint value '{}'".format(arg))
-                raise TypeError("Invalid constraint value '{}'".format(arg))
-
-        if min is None:
-            min = 0
-        if max is None:
-            max = np.inf
         if vary is None:
-            vary = value is None
+            vary = value is None and expr == ""
 
-        param.set(min=min, max=max, vary=vary, value=value, expr="")
+        try:
+            param = self.get_param(param_alias)
+        except ValueError:
+            LOG.debug(f"Skipped parameter {param_alias} (model {self.model})")
+            return
 
-        if expr is not None:
+        new = {
+            "value": value, "vary": vary, "min": min, "max": max, "expr": expr
+        }
+        old = self.get_constraints(param_alias)
+
+        for key, arg in new.items():
+            if arg != old[key] and arg is not None:
+                break
+        else:
+            return
+
+        if expr == "":
+            param.set(**new)
+        else:
             expr = self.relation2expr(expr, param_alias)
             try:
-                param.set(expr=expr, min=-np.inf, max=np.inf)
+                param.set(expr=expr, min=0, max=np.inf)
                 self.params.valuesdict()
             except (SyntaxError, NameError, TypeError):
-                old_par["expr"] = ""
-                param.set(**old_par)
+                old["expr"] = ""
+                param.set(**old)
                 self.emit("changed-peak")
                 LOG.warning("Invalid expression '{}'".format(expr))
 
-        LOG.info("Fit parameter set to '{}'".format(param))
+        LOG.info("Fit parameter set: '{}'".format(param))
         self.emit("changed-peak")
 
     def get_constraints(self, param_alias):
@@ -598,14 +606,7 @@ class Peak(Observable):
         try:
             param = self.get_param(param_alias)
         except ValueError:
-            constraints = {
-                "value": None,
-                "min": -np.inf,
-                "max": np.inf,
-                "vary": None,
-                "expr": ""
-            }
-            return constraints
+            return self._default_constraints
 
         relation = ""
         if param.expr is not None:
@@ -636,7 +637,6 @@ class Peak(Observable):
     def relation2expr(self, relation, param_alias):
         """Translates a human-readable arithmetic relation to an expr string.
         """
-        param_name = self.param_aliases[param_alias]
         def name_repl(matchobj):
             """Replaces 'peakname' by 'peakname_param' (searches
             case-insensitive).
@@ -645,8 +645,11 @@ class Peak(Observable):
             name = name.upper()
             if name == self.name.upper():
                 raise ValueError("Self-reference in peak constraint")
-            if name in [peak.name.upper() for peak in self.spectrum.peaks]:
-                return "{}_{}".format(name, param_name)
+            for peak in self.spectrum.peaks:
+                if peak.name.upper() == name:
+                    other = peak
+                    param_name = other.param_aliases[param_alias]
+                    return "{}_{}".format(name, param_name)
             return name
         regex = r"\b[A-Za-z][A-Za-z0-9]*"
         expr = re.sub(regex, name_repl, relation)
@@ -678,6 +681,12 @@ class Peak(Observable):
             area["value"], fwhm["value"], position["value"],
             alpha["value"], beta["value"], gamma["value"]
         )
+        self.set_constraint("fwhm", **fwhm)
+        self.set_constraint("area", **area)
+        self.set_constraint("position", **position)
+        self.set_constraint("alpha", **alpha)
+        self.set_constraint("beta", **beta)
+        self.set_constraint("gamma", **gamma)
         self.emit("changed-peak")
 
     def get_area(self):

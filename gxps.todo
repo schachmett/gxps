@@ -1,5 +1,6 @@
 * write tests
 * add background types
+* improve image export
 
 Low priority:
 * move state.titles to a designated module
