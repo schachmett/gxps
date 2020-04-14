@@ -1,22 +1,25 @@
+Major:
 * handle bright mode / dark mode
-* improve plot update handling
 * make plot customisable
 * show residuals
 * write tests
-* add background types
 * improve image export
 
 Low priority:
-* move state.titles to a designated module
+* manage plot colors
+* handle state.titles and view preferences in a saveable way (to .gxps or in the config?)
+* improve plot update handling
 * rehaul background bounds
 * replace pbr dependency by importlib.metadata (requires higher python3 version)
 * fine tune bus priority and event checking
 * make detailed signals instead of putting everything in event properties
 * use f-string interpolation (requires python3.6)
+* add background types and peak shapes
 
 Unclear if doable:
 * make emitting signals a decorator
 * make bus firing a decorator
+* include fittable background
 
 Unclear if it provides an advantage
 * abolish the CONFIG, COLORS and dunder singletons

@@ -2604,7 +2604,6 @@ E.g.: "O Si C V Ti"</property>
   </object>
   <object class="GXPSSaveConfirmationDialog" id="save_confirmation_dialog">
     <property name="can_focus">False</property>
-    <property name="title" translatable="yes">Save current file?</property>
     <property name="resizable">False</property>
     <property name="modal">True</property>
     <property name="window_position">center-on-parent</property>
@@ -2612,10 +2611,10 @@ E.g.: "O Si C V Ti"</property>
     <property name="default_height">120</property>
     <property name="destroy_with_parent">True</property>
     <property name="icon_name">dialog-question-symbolic</property>
-    <property name="type_hint">dialog</property>
+    <property name="type_hint">normal</property>
     <property name="urgency_hint">True</property>
     <property name="transient_for">main_window</property>
-    <child>
+    <child type="titlebar">
       <placeholder/>
     </child>
     <child internal-child="vbox">

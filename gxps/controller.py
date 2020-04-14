@@ -158,6 +158,7 @@ class File(Operator):
         to False. If the dialog is canceled, nothing happens and
         project_isaltered stays True."""
         dialog = self.get_widget("save_confirmation_dialog")
+        dialog.present_with_time(Gdk.CURRENT_TIME)
         response = dialog.run()
         if response == Gtk.ResponseType.YES:
             dialog.hide()
