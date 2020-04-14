@@ -341,6 +341,9 @@ class Fit(Operator):
     manipulation."""
     def on_add_region(self, *_args):
         """Add two region boundaries to each of the active spectra."""
+        button = self.get_widget("region_add_button")
+        if button.get_active() != True:
+            return
         navbar = self.get_widget("plot_toolbar")
         def add_region(emin, emax):
             """Add region"""
@@ -370,6 +373,9 @@ class Fit(Operator):
 
     def on_remove_region(self, *_args):
         """Remove selected region."""
+        button = self.get_widget("region_remove_button")
+        if button.get_active() != True:
+            return
         navbar = self.get_widget("plot_toolbar")
         def remove_region(_x_0, _y_0, x_1, _y_1):
             """Remove region"""
@@ -386,6 +392,9 @@ class Fit(Operator):
 
     def on_add_peak(self, *_args):
         """Add peak to active regions."""
+        button = self.get_widget("peak_add_button")
+        if button.get_active() != True:
+            return
         navbar = self.get_widget("plot_toolbar")
         shape_combo = self.get_widget("new_peak_model_combo")
         shape = shape_combo.get_active_text()
@@ -566,10 +575,16 @@ class ViewC(Operator):
 
     def on_pan_plot(self, *_args):
         """Activates plot panning."""
+        button = self.get_widget("mpl_pan_button")
+        if button.get_active() != True:
+            return
         navbar = self.get_widget("plot_toolbar")
         navbar.pan()
 
     def on_zoom_plot(self, *_args):
         """Activates plot panning."""
+        button = self.get_widget("mpl_zoom_button")
+        if button.get_active() != True:
+            return
         navbar = self.get_widget("plot_toolbar")
         navbar.zoom()

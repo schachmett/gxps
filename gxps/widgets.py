@@ -101,8 +101,15 @@ class GXPSCanvas(FigureCanvasGTK3Agg):
     def __init__(self):
         figure = Figure()
         super().__init__(figure)
-        self.ax = self.figure.add_axes([-0.005, 0.05, 1.01, 1.005])
+        # self.ax = self.figure.add_axes([-0.005, 0.05, 1.01, 1.005])
+        self.ax = self.figure.add_axes([-0.005, 0.05, 1.01, 0.905])
         self.ax.set_facecolor(COLORS["Canvas"]["canvas-facecolor"])
+        self.resid_ax = self.figure.add_axes(
+            [-0.005, 0.95, 1.01, 0.051],
+            sharex=self.ax
+        )
+        # self.resid_ax = self.figure.add_subplot()
+        self.resid_ax.set_facecolor(COLORS["Canvas"]["canvas-facecolor"])
         self.figure.patch.set_facecolor(COLORS["Canvas"]["canvas-facecolor"])
         self._xy_buffer = [0, 1, 0, 1]
         self._xy_center = [np.inf, -np.inf, np.inf, -np.inf]
@@ -162,30 +169,27 @@ class GXPSCanvas(FigureCanvasGTK3Agg):
     def _set_ticks(self):
         """Configures axes ticks.
         """
-        self.ax.spines["bottom"].set_visible(False)
-        self.ax.tick_params(
-            reset=True,
-            axis="both",
-            direction="out",
-            # pad=-20,
-            labelsize="large",
-            labelcolor=COLORS["Plotting"]["axisticks"],
-            color=COLORS["Plotting"]["axisticks"],
-            labelleft=False,
-            top=False,
-            left=False,
-            right=False,
-            bottom=False
-        )
+        tick_params = {
+            "reset": True,
+            "axis": "both",
+            "direction": "out",
+            "labelsize": "large",
+            "labelcolor": COLORS["Plotting"]["axisticks"],
+            "color": COLORS["Plotting"]["axisticks"],
+            "labelleft": False,
+            "top": False,
+            "left": False,
+            "right": False,
+            "bottom": False
+        }
         if self._xy_center[0] == np.inf:
-            self.ax.tick_params(
-                which="both",
-                bottom=False,
-                top=False,
-                left=False,
-                right=False,
-                labelbottom=False
-            )
+            tick_params.update({"labelbottom": False})
+        self.ax.tick_params(**tick_params)
+        self.ax.spines["bottom"].set_visible(False)
+
+        tick_params.update({"labelbottom": False})
+        self.resid_ax.tick_params(**tick_params)
+        self.resid_ax.spines["bottom"].set_visible(False)
 
 
 class DraggableVLineContainer(Gtk.DrawingArea):
@@ -555,7 +559,7 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
             if label not in exclude:
                 button.set_active(False)
 
-    def disable_tools(self):
+    def disable_tools(self, untoggle_buttons=True):
         """Release widgetlock and disconnect all signals associated with
         native matplotlib toolbar tools.
         """
@@ -566,8 +570,12 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
 
         self._active = None
         self.mode = ""
-        self.untoggle_buttons()
+        if untoggle_buttons:
+            self.untoggle_buttons()
         self.release_all_tools()
+        self.point_selector.active = False
+        self.span_selector.active = False
+        self.peak_selector.active = False
         for ax in self.canvas.figure.get_axes():
             ax.set_navigate_mode(self._active)
         self.set_message(self.mode)
@@ -592,42 +600,21 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
         callback(x0, y0, x, y) where x0, y0 are the coords when pressing
         the mouse and x, y are the coords when releasing.
         """
-        if self._idPress is not None:
-            self._idPress = self.canvas.mpl_disconnect(self._idPress)
-            self.mode = ""
-        if self._idRelease is not None:
-            self._idRelease = self.canvas.mpl_disconnect(self._idRelease)
-            self.mode = ""
-
         mode = "Remove region"
-
-        self.release_all_tools()
         if self._active == mode:
-            self._active = None
-            self.mode = ""
-            self.point_selector.active = False
-            self.set_message(self.mode)
+            self.disable_tools()
             return
-
+        self.disable_tools(untoggle_buttons=False)
         self._active = mode
         self.mode = mode
         self.untoggle_buttons(exclude=[mode])
         self.canvas.widgetlock(self.point_selector)
-        for ax in self.canvas.figure.get_axes():
-            ax.set_navigate_mode(None)
-        self.set_message(self.mode)
 
         def on_selected(x0, y0, x, y):
             """Callback caller."""
-            self._active = None
-            self.mode = ""
-            self.untoggle_buttons()
-            self.point_selector.active = False
-            self.release_all_tools()
-            self.set_message(self.mode)
+            self.disable_tools()
             self._set_cursor(event=None)
             callback(x0, y0, x, y)
-
         self.point_selector.onselect = on_selected
         self.point_selector.onmove_callback = onmove_callback
         self.point_selector.active = True
@@ -636,39 +623,19 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
         """Gets a span and then calls callback(min, max). Also takes care
         of widgetlock and such.
         """
-        if self._idPress is not None:
-            self._idPress = self.canvas.mpl_disconnect(self._idPress)
-            self.mode = ""
-        if self._idRelease is not None:
-            self._idRelease = self.canvas.mpl_disconnect(self._idRelease)
-            self.mode = ""
-
         mode = "Add region"
-
-        self.release_all_tools()
         if self._active == mode:
-            self._active = None
-            self.mode = ""
-            self.span_selector.active = False
-            self.set_message(self.mode)
+            self.disable_tools()
             return
-
+        self.disable_tools(untoggle_buttons=False)
         self._active = mode
         self.mode = mode
         self.untoggle_buttons(exclude=[mode])
         self.canvas.widgetlock(self.span_selector)
-        for ax in self.canvas.figure.get_axes():
-            ax.set_navigate_mode(None)
-        self.set_message(self.mode)
 
         def on_selected(emin, emax):
             """Callback caller."""
-            self._active = None
-            self.mode = ""
-            self.untoggle_buttons()
-            self.span_selector.active = False
-            self.release_all_tools()
-            self.set_message(self.mode)
+            self.disable_tools()
             self._set_cursor(event=None)
             callback(emin, emax)
         rectprops = {
@@ -687,39 +654,19 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
         """Gets a wegde and then calls callback(center, height, fwhm).
         Also takes care of widgetlock and such.
         """
-        if self._idPress is not None:
-            self._idPress = self.canvas.mpl_disconnect(self._idPress)
-            self.mode = ""
-        if self._idRelease is not None:
-            self._idRelease = self.canvas.mpl_disconnect(self._idRelease)
-            self.mode = ""
-
         mode = "Add peak"
-
-        self.release_all_tools()
         if self._active == mode:
-            self._active = None
-            self.mode = ""
-            self.peak_selector.active = False
-            self.set_message(self.mode)
+            self.disable_tools()
             return
-
+        self.disable_tools(untoggle_buttons=False)
         self._active = mode
         self.mode = mode
         self.untoggle_buttons(exclude=[mode])
         self.canvas.widgetlock(self.peak_selector)
-        for ax in self.canvas.figure.get_axes():
-            ax.set_navigate_mode(None)
-        self.set_message(self.mode)
 
         def on_selected(center, height, angle):
             """Callback caller."""
-            self._active = None
-            self.mode = ""
-            self.untoggle_buttons()
-            self.peak_selector.active = False
-            self.release_all_tools()
-            self.set_message(self.mode)
+            self.disable_tools()
             self._set_cursor(event=None)
             callback(center, height, angle)
         wedgeprops = {
@@ -744,70 +691,52 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
         """
         # set the pointer icon and button press funcs to the
         # appropriate callbacks
-        if self._active == 'PAN':
-            self._active = None
-        else:
-            self._active = 'PAN'
-        if self._idPress is not None:
-            self._idPress = self.canvas.mpl_disconnect(self._idPress)
-            self.mode = ''
-        if self._idRelease is not None:
-            self._idRelease = self.canvas.mpl_disconnect(self._idRelease)
-            self.mode = ''
-
         mode = "Pan / Zoom"
-        self.release_all_tools()        # changed here
+        if self._active == mode:
+            self.disable_tools()
+            return
+        self.disable_tools(untoggle_buttons=False)
+        self._active = "PAN"
+        self.mode = mode
         self.untoggle_buttons(exclude=[mode])
+        self.canvas.widgetlock(self)
 
         def local_release_pan(*args, **kwargs):
             """Use the super release_pan, but also untoggle the button."""
             self.release_pan(*args, **kwargs)
-            self.untoggle_buttons()
-
-        if self._active:
-            self._idPress = self.canvas.mpl_connect(
-                'button_press_event', self.press_pan)
-            self._idRelease = self.canvas.mpl_connect(
-                'button_release_event', local_release_pan)
-            self.mode = mode
-            self.canvas.widgetlock(self)
-        for ax in self.canvas.figure.get_axes():
-            ax.set_navigate_mode(self._active)
+            # self.untoggle_buttons()
+        self._idPress = self.canvas.mpl_connect(
+            'button_press_event', self.press_pan)
+        self._idRelease = self.canvas.mpl_connect(
+            'button_release_event', local_release_pan)
+        # for ax in self.canvas.figure.get_axes(): #TODO only main ax?
+        #     ax.set_navigate_mode(self._active)
+        self.canvas.ax.set_navigate_mode(self._active) #TODO not this
         self.set_message(self.mode)
 
     def zoom(self, *args):
         """Activate zoom to rect mode.
         OVERWRITE because of widgetlock release.
         """
-        if self._active == 'ZOOM':
-            self._active = None
-        else:
-            self._active = 'ZOOM'
-        if self._idPress is not None:
-            self._idPress = self.canvas.mpl_disconnect(self._idPress)
-            self.mode = ''
-        if self._idRelease is not None:
-            self._idRelease = self.canvas.mpl_disconnect(self._idRelease)
-            self.mode = ''
-
         mode = "Zoom Rectangle"
-        self.release_all_tools()        # changed here
+        if self._active == mode:
+            self.disable_tools()
+            return
+        self.disable_tools(untoggle_buttons=False)
+        self._active = "ZOOM"
+        self.mode = mode
         self.untoggle_buttons(exclude=[mode])
+        self.canvas.widgetlock(self)
 
         def local_release_zoom(*args, **kwargs):
             """Use the super release_zoom, but also untoggle the button."""
             self.release_zoom(*args, **kwargs)
             self.untoggle_buttons()
-
-        if self._active:
-            self._idPress = self.canvas.mpl_connect(
-                'button_press_event', self.press_zoom)
-            self._idRelease = self.canvas.mpl_connect(
-                'button_release_event', local_release_zoom)
-            self.mode = mode
-            self.canvas.widgetlock(self)
-        for ax in self.canvas.figure.get_axes():
-            ax.set_navigate_mode(self._active)
+        self._idPress = self.canvas.mpl_connect(
+            'button_press_event', self.press_zoom)
+        self._idRelease = self.canvas.mpl_connect(
+            'button_release_event', local_release_zoom)
+        self.canvas.ax.set_navigate_mode(self._active)
         self.set_message(self.mode)
 
     def draw_rubberband(self, event, x0, y0, x1, y1):
@@ -833,7 +762,6 @@ class GXPSPlotToolbar(NavigationToolbar2GTK3, Gtk.Toolbar):
         """Centers view and disables navbar tools.
         """
         self.disable_tools()
-        self.untoggle_buttons()
         self.canvas.center_view()
         self.canvas.draw_idle()
 

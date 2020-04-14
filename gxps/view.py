@@ -151,6 +151,7 @@ class Plot(View):
         super().__init__(*args, **kwargs)
         self._canvas = self.get_widget("main_canvas")
         self._ax = self._canvas.ax
+        self._resid_ax = self._canvas.resid_ax
 
     def update(self, event, keepaxes=True):
         """Updates plot by redrawing the whole thing. Relies on
@@ -173,9 +174,11 @@ class Plot(View):
         if keepaxes:
             self._canvas.store_xylims()
         self._ax.cla()
+        self._resid_ax.cla()
         self._canvas.reset_xy_centerlims()
         self._plot_spectra()
         self._plot_peaks()
+        self._plot_residual()
         self._plot_rsf()
         # Either restore axis limits or center plot.
         if keepaxes:
@@ -223,6 +226,35 @@ class Plot(View):
                 max(spectrum.intensity)
             )
 
+    def _plot_residual(self):
+        line = {
+            "color": COLORS["Plotting"]["residual"],
+            "linewidth": 1,
+            "linestyle": "-",
+            "alpha": 0.8
+        }
+        residual_exists = False
+        for spectrum in self.state.active_spectra:
+            if (not spectrum.fit.any()
+                    or (spectrum.fit == spectrum.intensity).all()):
+                continue
+            self._resid_ax.plot(
+                spectrum.energy,
+                spectrum.residual,
+                **line
+            )
+            residual_exists = True
+            self._resid_ax.autoscale()
+        if residual_exists:
+            line = {
+                "color": COLORS["Plotting"]["axisticks"],
+                "alpha": 0.5,
+                "linestyle": "--",
+                "linewidth": 0.5
+            }
+            self._resid_ax.axhline(0, **line)
+
+
     def _plot_peaks(self):
         inactive_color = COLORS["Plotting"]["peak"]
         active_color = COLORS["Plotting"]["peak-active"]
@@ -254,6 +286,8 @@ class Plot(View):
                     spectrum.background + peak.intensity,
                     **line
                 )
+            if not any(spectrum.fit):
+                continue
             line = {
                 "color": sum_color,
                 "linewidth": 1,

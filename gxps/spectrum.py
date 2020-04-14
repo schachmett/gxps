@@ -335,6 +335,11 @@ class ModeledSpectrum(Spectrum):
         return fit
 
     @property
+    def residual(self):
+        """Returns the fit residual."""
+        return self.intensity - self.background - self.fit
+
+    @property
     def model(self):
         """Returns the sum of all peak models."""
         model = ConstantModel(prefix="BASE_")
@@ -538,6 +543,8 @@ class Peak(Observable):
     @label.setter
     def label(self, value):
         """Emit a signal when changing the label."""
+        if self._label == value:
+            return
         self._label = value
         self.emit("changed-peak-meta", attr="label", value=value)
 

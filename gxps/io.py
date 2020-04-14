@@ -27,7 +27,7 @@ def convert_older_version(state):
     """If the project file has an older version, this should convert it.
     """
     if state[2] != __version__:
-        LOG.warning("Project file has older version '{}'".format(state[2]))
+        LOG.warning(f"Project file has different version: '{state[2]}'")
     state.remove(state[2])
     return state
 
