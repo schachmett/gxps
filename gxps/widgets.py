@@ -249,7 +249,7 @@ class GXPSEditSpectrumDialog(Gtk.Dialog):
         """Sends APPLY response."""
         self.emit("response", Gtk.ResponseType.APPLY)
 
-    def add_editor_row(self, attr, labeltext, entrytext):
+    def add_editable_row(self, attr, labeltext, entrytext):
         """Builds a row for editing an attribute. Returns a method for
         getting the new value.
         """

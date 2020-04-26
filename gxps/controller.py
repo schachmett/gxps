@@ -150,6 +150,8 @@ class File(Operator):
             for specdict in specdicts:
                 spectrum = self.data.add_spectrum(**specdict)
                 spectrum.register_queue(self.bus)
+        if not self.state.active_spectra:
+            self.state.active_spectra = [self.data.spectra[0]]
         dialog.hide()
         self.bus.fire()
 
@@ -283,16 +285,46 @@ class Edit(Operator):
         if not spectra:
             return
         self.state.editing_spectra = spectra
+        self.bus.fire()
         dialog = self.get_widget("edit_spectrum_dialog")
         response = dialog.run()
         if response == Gtk.ResponseType.APPLY:
             values = dialog.get_values()
             for spectrum in spectra:
                 for attr, value in values.items():
+                    if attr == "photon_energy":
+                        spectrum.photon_energy = float(value)
+                        continue
                     spectrum.set_meta(attr, value)
         dialog.hide()
         self.state.editing_spectra = []
         self.bus.fire()
+    # def on_edit_spectra(self, *_args):
+    #     """Opens an 'Edit' dialog for selected spectra."""
+    #     spectra = self.state.selected_spectra
+    #     if not spectra or len(spectra) > 1:
+    #         return
+    #     self.state.editing_spectra = spectra
+    #     spectrum = spectra[0]
+    #     dialog = self.get_widget("edit_spectrum_dialog")
+    #     dialog.flush()
+    #     dialog.add_non_editable_row("Filename", spectrum.get_meta("filename"))
+    #     dialog.add_editable_row(
+    #         "photon_energy", "Photon energy (eV)", spectrum.photon_energy)
+    #     for attr in spectrum.properties:
+    #         dialog.add_editable_row(
+    #             attr, attr.title(), spectrum.get_meta(attr))
+    #     response = dialog.run()
+    #     if response == Gtk.ResponseType.APPLY:
+    #         values = dialog.get_values()
+    #         for attr, value in values.items():
+    #             if attr == "photon_energy":
+    #                 spectrum.photon_energy = float(value)
+    #                 continue
+    #             spectrum.set_meta(attr, value)
+    #     dialog.hide()
+    #     self.state.editing_spectra = []
+    #     self.bus.fire()
 
     def on_calibrate(self, *_args):
         """Changes the calibration for selected spectra."""

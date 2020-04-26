@@ -67,7 +67,7 @@ TITLES = {
         "name": "Name",
         "notes": "Notes",
         "pass_energy": "Pass Energy",
-        "integration_time": "Time per Data Point",
+        "dwelltime": "Time per Data Point",
         "sweeps": "Sweeps"
     }),
     "norm_types": OrderedBidict({

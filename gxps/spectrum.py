@@ -128,6 +128,11 @@ class Spectrum(Observable, MetaDataContainer):
         """Expose metadatum "name"."""
         return self.get_meta("name")
 
+    @property
+    def properties(self):
+        """Expose list of meta attributes."""
+        return list(self._meta.keys())
+
     # Energy-related
     @property
     def energy(self):
@@ -143,6 +148,14 @@ class Spectrum(Observable, MetaDataContainer):
     def photon_energy(self):
         """Photon energy numpy array."""
         return self._photon_energy
+
+    @photon_energy.setter
+    def photon_energy(self, value):
+        """Photon energy can be set from outside."""
+        diff = value - self._photon_energy
+        self._photon_energy = value
+        self._energy = self._energy + diff
+        self.emit("changed-spectrum", attr="photon_energy")
 
     @property
     def energy_calibration(self):

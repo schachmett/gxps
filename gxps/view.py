@@ -739,6 +739,19 @@ class EditDialog(View):
             else:
                 valuestring = values[0]
             return valuestring
+        def get_attr_value_string(attr, separator=" | "):
+            """Returns string to go inside the value fields."""
+            if not spectra:
+                return ""
+            if len(spectra) == 1:
+                return str(getattr(spectra[0], attr))
+            values = [str(getattr(spectrum, attr)) for spectrum in spectra]
+            valueset = set(values)
+            if len(valueset) > 1:
+                valuestring = separator.join(valueset) + self._exclusion_key
+            else:
+                valuestring = values[0]
+            return valuestring
 
         for attr, title in self.state.titles["static_specinfo"].items():
             try:
@@ -746,9 +759,14 @@ class EditDialog(View):
             except AttributeError:
                 valstring = "NO VALUE SET"
             self._dialog.add_non_editable_row(title, valstring)
+        self._dialog.add_editable_row(
+            "photon_energy",
+            "Photon energy (eV)",
+            get_attr_value_string("photon_energy")
+        )
         for attr, title in self.state.titles["editing_dialog"].items():
             try:
                 valstring = get_value_string(attr, separator="\n")
             except AttributeError:
                 valstring = "NO VALUE SET"
-            self._dialog.add_editor_row(attr, title, valstring)
+            self._dialog.add_editable_row(attr, title, valstring)
