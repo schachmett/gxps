@@ -57,6 +57,8 @@ def parse_spectrum_file(fname):
         if "Region" in firstline:
             for specdict in parse_eistxt(fname):
                 specdicts.append(specdict)
+        if "[Info]" in firstline:
+            specdicts.append(parse_arpestxt(fname))
         elif re.fullmatch(r"\d+\.\d+,\d+\n", firstline):
             specdicts.append(parse_simple_xy(fname, delimiter=","))
     elif fname.split(".")[-1] == "xy":
@@ -82,6 +84,7 @@ def parse_simple_xy(fname, delimiter=None):
         "filename": fname,
         "energy": energy,
         "intensity": intensity,
+        "energy_scale": "binding",
         "name": "S XY",
         "notes": "file {}".format(fname.split("/")[-1])
     }
@@ -117,6 +120,7 @@ def parse_eistxt(fname):
             "filename": fname,
             "energy": energy,
             "intensity": intensity,
+            "energy_scale": "binding",
             "eis_region": int(header[1][0]),
             "name": "S {}".format(header[1][0]),
             "sweeps": int(header[1][6]),
@@ -125,6 +129,47 @@ def parse_eistxt(fname):
             "notes": header[1][12],
         }
         yield specdict
+
+
+def parse_arpestxt(fname):
+    """Reads a txt file obtained from Elettra's VUV beamline."""
+    properties = {}
+    energy = []
+    intensity = []
+    is_data = False
+    databegin_regex = re.compile(r"^\[Data [0-9]+\]")
+    datarow_regex = re.compile(
+        r"^\s[0-9]+\.?[0-9]*(E\+)?[0-9]*\s*[0-9]+\.?[0-9]*(E\+)?[0-9]*\s*$"
+    )
+    with open(fname, "r") as afile:
+        for line in afile:
+            if "=" in line:
+                key, value = line.split("=")[:2]
+                properties[key.strip()] = value.strip()
+            if re.match(databegin_regex, line):
+                is_data = True
+                continue
+            if not is_data:
+                continue
+            if not re.match(datarow_regex, line):
+                is_data = False
+                continue
+            estring, istring = line.strip().split()
+            energy.append(float(estring))
+            intensity.append(float(istring))
+    specdict = {
+        "filename": fname,
+        "energy": energy,
+        "intensity": intensity,
+        "energy_scale": properties["Energy Scale"].lower(),
+        "name": properties["Spectrum Name"],
+        "sweeps": int(properties["Number of Sweeps"]),
+        "dwelltime": 0.001 * float(properties["Step Time"]),
+        "pass_energy": float(properties["Pass Energy"]),
+        "notes": properties["Comments"],
+        "time": f"{properties['Date']}, {properties['Time']}",
+    }
+    return specdict
 
 
 def get_element_rsfs(element, source):
