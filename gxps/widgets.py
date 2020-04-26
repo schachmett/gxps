@@ -125,6 +125,7 @@ class GXPSCanvas(FigureCanvasGTK3Agg):
     def restore_xylims(self):
         """Sets the axis limits to the ones stored in self._xy_buffer.
         """
+        self.resid_ax.autoscale()
         if not np.all(np.isfinite(self._xy_buffer)):
             self._xy_buffer = [0, 1, 0, 1]
         xmin, xmax, ymin, ymax = self._xy_buffer

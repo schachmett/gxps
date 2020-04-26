@@ -195,6 +195,8 @@ class EventBus:
                     f"with prio {prio}"
                 )
                 callback(event_list)
+            if self._queue:
+                self.fire()
         else:
             if signal not in self._queue or not self._queue[signal]:
                 return
@@ -206,6 +208,8 @@ class EventBus:
             subs = self._subscribers[signal]
             for callback, _prio in sorted(subs, key=lambda x: x[1]):
                 callback(event_list)
+            if signal in self._queue:
+                self.fire(signal)
 
     def set_policy(self, policy, signal="all"):
         """Sets a policy for how to act on incoming events.

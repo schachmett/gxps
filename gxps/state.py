@@ -232,6 +232,7 @@ class State(Observable):
     @current_project.setter
     def current_project(self, value):
         """Set the current project file name, also in the config."""
+        self._project_isaltered = False
         if value == "Untitled" or not value:
             self._current_project = "Untitled"
             CONFIG["IO"]["current-project"] = ""
@@ -240,7 +241,6 @@ class State(Observable):
             self._current_project = value
             CONFIG["IO"]["current-project"] = value
             self.emit("changed-project", attr="filename")
-        self._project_isaltered = False
 
     @property
     def project_isaltered(self):

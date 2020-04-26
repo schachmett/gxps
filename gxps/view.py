@@ -119,6 +119,8 @@ class Window(View):
             if isaltered:
                 fname += "*"
             win.set_title(u"{} — {}".format(fname, __appname__))
+        elif isaltered:
+            win.set_title(u"Untitled* — {}".format(__appname__))
         else:
             win.set_title(__appname__)
 

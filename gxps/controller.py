@@ -76,6 +76,7 @@ class File(Operator):
     def new(self):
         """Make new project."""
         self.data.clear()
+        self.bus.fire()
         self.state.current_project = ""
         LOG.info("New project")
 
