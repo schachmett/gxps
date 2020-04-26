@@ -90,7 +90,12 @@ class Spectrum(Observable, MetaDataContainer):
         super().__init__()
         self._default_meta_value = ""
 
+        self._photon_energy = kwargs.pop("photon_energy", 0)
+
         energy = np.array(kwargs.pop("energy"))
+        energy_scale = kwargs.pop("energy_scale", "binding")
+        if energy_scale == "kinetic":
+            energy = self.photon_energy - energy
         intensity = np.array(kwargs.pop("intensity"))
         if len(energy) != len(intensity) or energy.ndim != 1:
             raise ValueError("energy and intensity array sizes differ")
@@ -132,12 +137,12 @@ class Spectrum(Observable, MetaDataContainer):
     @property
     def kinetic_energy(self):
         """Kinetic energy numpy array."""
-        raise NotImplementedError
+        return self.photon_energy - self._energy + self._energy_calibration
 
     @property
     def photon_energy(self):
         """Photon energy numpy array."""
-        raise NotImplementedError
+        return self._photon_energy
 
     @property
     def energy_calibration(self):
@@ -241,8 +246,8 @@ class Spectrum(Observable, MetaDataContainer):
         self._background_type = value
         self._background = calculate_background(
             self.background_type,
-            self.background_bounds,
-            self.energy,
+            self._background_bounds,
+            self._energy,
             self._intensity
         )
         LOG.info("'{}' changed bg type to '{}'".format(self, value))
@@ -496,9 +501,9 @@ class Peak(Observable):
             raise NotImplementedError("Unkown shape '{}'".format(self._shape))
 
         self.params += self._model.make_params()
-        self.get_param("fwhm").set(value=abs(fwhm), min=0, vary=True)
-        self.get_param("amplitude").set(value=abs(area), min=0, vary=True)
-        self.get_param("center").set(value=abs(position), min=0, vary=True)
+        self.get_param("fwhm").set(value=fwhm, min=0, vary=True)
+        self.get_param("amplitude").set(value=area, min=0, vary=True)
+        self.get_param("center").set(value=position, min=-np.inf, vary=True)
         # if self._shape == "PseudoVoigt":
         #     self.get_param("sigma").set(expr="{}_fwhm/2".format(self.name))
 
@@ -574,6 +579,8 @@ class Peak(Observable):
         # pylint: disable=redefined-builtin
         if vary is None:
             vary = value is None and expr == ""
+        if param_alias == "position" and min == 0:
+            min = -np.inf
 
         try:
             param = self.get_param(param_alias)
