@@ -4,6 +4,7 @@ Major:
 * show residuals
 * write tests
 * improve image export
+* don't crash on importing unknown files
 
 Low priority:
 * manage plot colors

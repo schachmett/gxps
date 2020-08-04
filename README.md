@@ -14,8 +14,7 @@ GXPS is a tool for visualizing and fitting X-ray photoelectron spectroscopy (XPS
 GTK needs to be version `>=3.14`. If you don't already have it installed, install python (`>=3.5`) and pip as well as libffi6 and python-gi through your package manager:
 
 ```shell
-$ sudo apt install python3 pip3 libffi6 python3-gi libgirepository1.0-dev \
-  python3-gi-cairo gir1.2-gtk-3.0
+$ sudo apt install python3 pip3 libffi6 python3-gi libgirepository1.0-dev gir1.2-gtk-3.0 python3-gi-cairo libcairo2-dev python3-cairo-dev
 ```
 
 (I don't know if you really need all of those dependencies)
