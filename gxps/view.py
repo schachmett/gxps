@@ -166,7 +166,8 @@ class Plot(View):
             for attr in event.properties["attr"]:
                 if attr in ("normalization_type", "normalization_divisor"):
                     keepaxes = False
-        if event.signal == "changed-active":
+        if (event.signal == "changed-active"
+                and "peaks" not in event.properties["attr"]):
             keepaxes = False
         self._update(keepaxes)
 

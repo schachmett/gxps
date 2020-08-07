@@ -609,15 +609,17 @@ class ViewC(Operator):
     def on_pan_plot(self, *_args):
         """Activates plot panning."""
         button = self.get_widget("mpl_pan_button")
-        if button.get_active() != True:
-            return
         navbar = self.get_widget("plot_toolbar")
+        if button.get_active() != True:
+            navbar.disable_tools()
+            return
         navbar.pan()
 
     def on_zoom_plot(self, *_args):
         """Activates plot panning."""
         button = self.get_widget("mpl_zoom_button")
-        if button.get_active() != True:
-            return
         navbar = self.get_widget("plot_toolbar")
+        if button.get_active() != True:
+            navbar.disable_tools()
+            return
         navbar.zoom()

@@ -67,6 +67,11 @@ class Event:
         """Expose the signal."""
         return self._signal
 
+    def __str__(self):
+        info = (f"event signal {self._signal} has properties: "
+                f"{self.properties} from sources {self.source}")
+        return info
+
 
 class EventList(Event):
     """A list of events that behaves like an event but has all the
