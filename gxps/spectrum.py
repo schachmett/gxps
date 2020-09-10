@@ -483,7 +483,7 @@ class Peak(Observable):
 
     def initialize_model(self, area, fwhm, position, alpha, beta, gamma):
         """Initialize the peak model and the parameters."""
-        # pylint: disable=too-many-arguments
+        # pylint: disable=too-many-arguments, unused-argument
         self.clear_params()
         self.param_aliases = {
             "area": "amplitude",
@@ -509,8 +509,6 @@ class Peak(Observable):
             self._model = VoigtModel(prefix="{}_".format(self.name))
             self._model.set_param_hint("fwhm_l", min=0, value=alpha)
         else:
-            if "" in (beta, gamma, ):
-                pass #only for linter
             raise NotImplementedError("Unkown shape '{}'".format(self._shape))
 
         self.params += self._model.make_params()

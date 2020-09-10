@@ -228,3 +228,19 @@ def export_txt(fname, spectrum):
         header += "{:_<12}_{:_<3}_peakint\t".format(name, peak_name)
     data = np.column_stack(column_stack)
     np.savetxt(fname, data, delimiter="\t", header=header)
+
+
+def export_params(fname, spectrum):
+    """Export given spectra and everything that belongs to it as txt."""
+    params = ("area", "fwhm", "position", "alpha", "beta", "gamma")
+    header = "\t".join(params)
+    data = []
+    for peak in spectrum.peaks:
+        row = []
+        row.append(peak.label)
+        row.append(peak.shape)
+        for par in params:
+            value = peak.get_constraints(par)["value"]
+            row.append(value)
+        data.append(row)
+    np.savetxt(fname, data, delimiter="\t", header=header, fmt="%s")

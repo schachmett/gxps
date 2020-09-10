@@ -18,7 +18,7 @@ clean:
 	rm -Rf *~
 
 bump_release:
-	@if [ ! -z $(TAG) ] && [ ! -z $(DESCRIPTION) ]; then \
+	@if [ ! -z $(TAG) ] && [ ! -z "$(DESCRIPTION)" ]; then \
 		echo 'git tag -a $(TAG) -m $(DESCRIPTION);' \
 		git tag -a $(TAG) -m $(DESCRIPTION); \
 		echo 'git push --tags'; \

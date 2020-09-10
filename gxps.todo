@@ -1,4 +1,5 @@
 Major:
+* measure peak areas correctly
 * handle bright mode / dark mode
 * make plot customisable
 * show residuals

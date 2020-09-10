@@ -102,7 +102,8 @@ class GXPS(Gtk.Application):
         ]
         actions = [
             "project-new", "save-project", "save-project-as", "open-project",
-            "merge-project", "import-spectra", "export-txt", "export-image",
+            "merge-project", "import-spectra", "export-txt", "export-params",
+            "export-image",
 
             "edit-spectra", "remove-spectra", "avg-selected-spectra",
 

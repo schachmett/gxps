@@ -221,6 +221,25 @@ class File(Operator):
         dialog.hide()
         self.bus.fire()
 
+    def on_export_params(self, *_args):
+        """Exports the currently selected spectra's peak parameters an ASCII
+        file.
+        """
+        spectra = self.state.active_spectra
+        dialog = self.get_widget("export_txt_dialog")
+        project_dir = os.path.expandvars(CONFIG["IO"]["project-dir"])
+        dialog.set_current_folder(project_dir)
+        for spectrum in spectra:
+            name = re.sub(r"\s+", "_", spectrum.name)
+            dialog.set_current_name(name + ".txt")
+            response = dialog.run()
+            if response == Gtk.ResponseType.OK:
+                fname = dialog.get_filename()
+                gxps.io.export_params(fname, spectrum)
+        CONFIG["IO"]["project-dir"] = dialog.get_current_folder()
+        dialog.hide()
+        self.bus.fire()
+
     def on_export_image(self, *_args):
         """Exports the image currently displayed on the exporting canvas.
         """

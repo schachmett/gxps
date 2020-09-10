@@ -35,6 +35,11 @@
 					<attribute name="accel">&lt;Primary&gt;&lt;Shift&gt;e</attribute>
 				</item>
 				<item>
+					<attribute name="label">_Export params as txt...</attribute>
+					<attribute name="action">app.export-params</attribute>
+					<attribute name="accel">&lt;Primary&gt;&lt;Shift&gt;p</attribute>
+				</item>
+				<item>
 					<attribute name="label">_Export as image...</attribute>
 					<attribute name="action">app.export-image</attribute>
 					<attribute name="accel">&lt;Primary&gt;&lt;Shift&gt;i</attribute>
