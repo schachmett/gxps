@@ -72,7 +72,7 @@ class State(Observable):
         self._app.bus.subscribe(
             self.update_active, "changed-spectra", priority=9)
         self._app.bus.subscribe(
-            self.update_active, "changed-fit", priority=0)
+            self.update_active, "changed-fit", priority=9)
         signals = (
             "changed-spectra",
             "changed-spectrum",
