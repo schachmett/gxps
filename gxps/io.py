@@ -59,10 +59,12 @@ def parse_spectrum_file(fname):
                 specdicts.append(specdict)
         if "[Info]" in firstline:
             specdicts.append(parse_arpestxt(fname))
-        elif re.fullmatch(r"\d+\.\d+,\d+\n", firstline):
+        elif re.fullmatch(r"\d+\.?\d*,\d+\.?\d*\n", firstline):
             specdicts.append(parse_simple_xy(fname, delimiter=","))
+        elif re.fullmatch(r"\d+\.?\d*\s\d+\.?\d*\n", firstline):
+            specdicts.append(parse_simple_xy(fname))
     elif fname.split(".")[-1] == "xy":
-        if re.fullmatch(r"\d+\.\d+,\d+\n", firstline):
+        if re.fullmatch(r"\d+\.?\d*,\d+\.?\d*\n", firstline):
             delimiter = ","
         else:
             delimiter = None

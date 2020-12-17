@@ -1,5 +1,6 @@
 Major:
 * measure peak areas correctly
+* fix crash when using some normalization methods
 * peak param window does not update sometimes --- fixed??
 * PseudoVoigt peak sometimes looks W-shaped (when a lot of peaks are near each other)
 * handle bright mode / dark mode
