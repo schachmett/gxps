@@ -3,7 +3,7 @@ cairocffi==1.0.0
 lmfit==0.9.12
 matplotlib==3.0.2
 more-itertools==5.0.0
-numpy==1.16.1
+numpy==1.22.0
 pycairo==1.18.0
 scipy==1.2.0
 pbr==5.4.4
